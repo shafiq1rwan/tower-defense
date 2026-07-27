@@ -32,8 +32,16 @@ worker only registers over `http`/`https`.
 | Gear button / `P` / `Esc` | Pause |
 
 Burn down the goblin hut before the clock runs out. If time expires, whichever
-base is in better shape wins. Your army is capped at 14 on the field, so slots are
+base is in better shape wins. Your army is capped at 8 on the field, so slots are
 a resource — the bar reads `ARMY FULL` when you're at the limit.
+
+That cap is 8 rather than something larger because two ranks can strike across
+three depth rows, so about six allies is all that can ever *reach* the enemy.
+A larger cap only adds units that queue at the back doing nothing: measured at
+the old cap of 14, a full army spent 76% of its time waiting and the Warrior
+line attacked 7% of the time. Sweeping the campaign at caps 14 / 10 / 8 — fresh
+save and fully upgraded — gives the same wins and clear times within a second,
+so the smaller cap costs no difficulty and every unit you buy is one that fights.
 
 ### Your roster
 
@@ -41,7 +49,7 @@ a resource — the bar reads `ARMY FULL` when you're at the limit.
 |---|---|---|
 | Pawn | 30 | Cheap and quick. Buys tempo, not damage — its short recharge plugs a collapsing line |
 | Warrior | 60 | The backbone. Best value on the front line, and blocks while it waits |
-| Archer | 90 | Kills from safety behind the melee. Useless if the line breaks |
+| Archer | 90 | Kills from behind the melee — but TNT dynamite is aimed at it, so it needs a screen and a healer |
 | Monk | 120 | Heals the most wounded ally nearby |
 | Lancer | 200 | Slow and brutal, striking from behind the front rank |
 
@@ -50,12 +58,29 @@ a resource — the bar reads `ARMY FULL` when you're at the limit.
 | Enemy | Threat |
 |---|---|
 | Torch Goblin | The horde staple — moderate melee, arrives constantly |
-| TNT Goblin | Lobs dynamite that detonates in an *area*, so a packed line takes the hit together |
+| TNT Goblin | Artillery. Lobs dynamite **over** your front line at the archers and monks hiding behind it. Your archers can't shoot back from that distance — kill its screen and let your melee reach it |
 | Barrel Bomb | A fast rolling keg that detonates on contact. Kill it at range or it takes your front rank with it |
 
-Spamming Pawns will carry you through the first five battles and then stop
-working — the area attacks punish clumped cheap units, so the later battles need a
-real composition.
+Spamming one card will not carry you. Pawns alone stop working almost immediately,
+and massing Archers behind a wall — the strongest-looking play, since they kill from
+safety — is exactly what the TNT goblins are built to punish. The later battles want a
+screen, ranged damage *and* a healer keeping the back line alive.
+
+### The Barracks
+
+Winning a battle pays out gold, scaled by how intact your tower is. Spend it in the
+**Barracks** (from the battle-select screen) on permanent training: three levels per
+class, each worth **+12% health and power**, so a fully trained class is +36%.
+
+Costs are 120 / 260 / 520 per level, or 900 to max one class and 4,500 to max all
+five. A flawless run of all eight battles banks about **1,416** gold — enough for a
+meaningful slice, not the lot, so which classes you invest in is a real choice.
+Replaying a battle pays out again, which is the reason to go back for three swords.
+
+Training is not optional decoration — **the final battle is built to need it.** On a
+fresh save, battles 1-7 are winnable with a good composition and battle 8 is not; the
+gold banked on the way there is what opens it. Spam does not substitute: with every
+class maxed, Pawn-spam alone still stalls around battle 4.
 
 ## How it's built
 

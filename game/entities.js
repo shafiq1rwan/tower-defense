@@ -17,15 +17,22 @@
   var ARROW_SPEED = 560;
   var GRAVITY = 620;
 
-  /* Field caps. Only about two ranks per lane can reach the enemy, so units
-     beyond this are dead weight that merely crowds the art. Scripted spawns are
-     deferred rather than dropped when the cap is hit, so a wave's total pressure
+  /* Field caps. Two ranks can strike and there are three depth rows, so only
+     about SIX allies can ever reach the enemy. The cap was 14, which meant slots
+     7-14 were pure decoration: they queued at the back, contributed nothing, and
+     read as a bug. Measured at the old cap, a full army spent 76% of its time
+     waiting and the Warrior line attacked just 7% of the time.
+
+     Dropping it to 8 is balance-neutral, not a nerf — verified by sweeping the
+     whole campaign at caps 14 / 10 / 8 on both a fresh save and fully upgraded:
+     same wins, clear times within a second or two. It only removes the dead
+     weight, so every unit bought is a unit fighting.
+
+     The player is capped BELOW the enemy on purpose: at equal caps the defence
+     is unbreakable and every battle ends at full castle HP. Scripted spawns are
+     deferred rather than dropped when a cap is hit, so a wave's total pressure
      still arrives — just spread out. */
-  /* The player is deliberately capped BELOW the enemy. With equal caps the
-     defence is unbreakable and every battle ends at full castle HP, which makes
-     both the tension and the star rating meaningless. Fewer slots also mean
-     filling them with cheap bodies has a real cost. */
-  var MAX_ALLY = 14;
+  var MAX_ALLY = 8;
   var MAX_FOE = 18;
 
   /* -------------------------------------------------------------- unit defs -- */
@@ -97,12 +104,30 @@
       /* Damage lands as the flame arc sweeps across, on frame 3 of 6. */
       fps: { idle: 8, run: 11, attack: 13 }, hitFrame: 3
     },
-    /* Lobs dynamite that detonates in an area, so a tightly packed player line
-       takes the hit together. */
+    /* Artillery: lobs dynamite OVER the melee at whatever is sheltering behind
+       it. This is the only thing in the game that threatens a player back line —
+       see findLobTarget for the measurements that made it necessary.
+
+       `lob` 440 is geometric, not taste. An Archer holds 205 behind the clash and
+       this goblin holds 200 in front of it, so a shot must carry 405 to reach one
+       (415 for a Monk at keepDistance 215). 440 clears both with a little slack
+       and stops short of the 451 a SECOND rank of TNT would need, so only the
+       front artillery rank can hit the back line.
+
+       `dmg` 34 is likewise derived. A Monk restores 32 every 2.2s — 14.5 hp/s —
+       so at this 2.1s cooldown anything under 30 dmg is simply out-healed and the
+       back line stays safe no matter how good the targeting is. Measured: at 20
+       and at 26 the campaign still ended at full tower HP. 34 is 16.2 hp/s, just
+       past one Monk, which is the point where keeping a healer alive becomes a
+       real decision rather than a formality.
+
+       The counter is deliberate: from 405px away the player's Archers (range 260)
+       cannot shoot back, so the answer is to kill the goblin screen and let melee
+       walk onto the TNT, which is fragile at 85hp. */
     TNT: {
       name: 'TNT Goblin', body: 86, enemy: true,
-      hp: 85, dmg: 11, contact: 200, range: 250, speed: 44,
-      cooldown: 2.1, height: 88, ranged: true, aoe: 58,
+      hp: 85, dmg: 34, contact: 200, range: 250, speed: 44,
+      cooldown: 2.1, height: 88, ranged: true, aoe: 58, lob: 440,
       fps: { idle: 8, run: 11, attack: 12 }, hitFrame: 5
     },
     /* A rolling keg: quick, fragile, and detonates on contact instead of
@@ -300,12 +325,18 @@
     this.dir = isPlayer ? 1 : -1;
     this.lane = lane;
     this.feetY = LAY.lanes[lane];
-    this.x = isPlayer ? LAY.playerSpawnX : LAY.enemySpawnX;
+    /* Stagger the spawn along the march direction by depth row, so a burst of
+       summons leaves the gate as a diagonal column instead of stacking into one
+       vertical line at a single point. */
+    this.x = (isPlayer ? LAY.playerSpawnX : LAY.enemySpawnX) +
+      this.dir * (lane - 1) * 10;
 
     var mul = buff || 1;
     this.maxHp = Math.round(this.def.hp * mul);
     this.hp = this.maxHp;
     this.dmg = Math.round((this.def.dmg || 0) * mul);
+    /* Scaled too, or the Monk would ignore upgrades entirely. */
+    this.healAmount = Math.round((this.def.heal || 0) * mul);
 
     /* Sprites are keyed by class alone — each class belongs to one faction. */
     this.spr = TS.SPR.unit[cls];
@@ -323,6 +354,10 @@
     this.target = null;
     this.stepT = 0;
     this.barShow = 0;
+    this.blockT = 0;
+    this.sideCd = 0;
+    this.lastX = this.x;
+    this.moved = 0;
   }
 
   Unit.prototype.animSpr = function () {
@@ -348,8 +383,12 @@
     TS.FX.number(this.x, this.feetY - this.def.height - 6, dmg, 'damage');
     TS.FX.hitSpark(this.x + this.dir * -10, this.feetY - this.def.height * 0.5,
       this.dir > 0);
-    /* Small shove away from the attacker, purely for feel. */
-    if (from) this.push = -this.dir * 7;
+    /* Flinch away from the hit, scaled by how much of this unit's health the blow
+       took. A Pawn's 6 damage and a barrel bomb's 32 used to flinch identically.
+       This is a DRAW offset only — it never moves the unit, so it cannot affect
+       reach or the tuned rank spacing. */
+    var bite = TS.clamp(dmg / Math.max(1, this.maxHp), 0, 1);
+    this.push = -this.dir * (5 + bite * 22);
     TS.Audio.play('hit');
 
     if (this.hp <= 0) {
@@ -410,6 +449,39 @@
     return best;
   };
 
+  /* The artillery target for a unit with `lob`: the nearest enemy that is
+     SHELTERING behind the screen — a ranged unit or a healer.
+
+     Without this the back line is untouchable. Measured over a full battle with
+     a normal composition, the Archer took 60 damage to the Warrior's 724, because
+     everything aims at the nearest enemy and the nearest enemy is always the
+     melee screen. A back line therefore won by default, and upgrades to it just
+     won faster.
+
+     "Deepest enemy" was the obvious first rule and it is wrong: measured, it
+     aimed at a Warrior on 11 of 11 shots, because the farthest player unit is
+     usually a fresh reinforcement still walking up from the tower, not the
+     archer line. Selecting on ROLE rather than distance is what actually lobs
+     the dynamite over the wall. Nearest-of-those, so the shot is one it can
+     reach; falls back to the ordinary target when nothing is hiding.
+
+     Deliberately separate from the FIRE GATE, which stays `findEnemy(def.range)`.
+     If `lob` also gated firing, every rank of artillery could shoot from far
+     back — `range` keeps that to two ranks (see the contact/range invariant
+     above) while `lob` only decides who the shot is aimed at. */
+  Unit.prototype.findLobTarget = function (maxRange) {
+    var list = this.battle.units;
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (o.dead || o.isPlayer === this.isPlayer) continue;
+      if (!o.def.ranged && !o.def.healer) continue;
+      var d = Math.abs(o.x - this.x);
+      if (d <= maxRange && d < bestD) { bestD = d; best = o; }
+    }
+    return best;
+  };
+
   /* Any enemy at all ahead of us within `dist` — used by the Monk to hold back
      and by everyone to avoid walking through the front line. */
   Unit.prototype.enemyAhead = function (dist) {
@@ -430,7 +502,47 @@
       if (o === this || o.dead || o.isPlayer !== this.isPlayer) continue;
       if (o.lane !== this.lane) continue;
       var dx = (o.x - this.x) * this.dir;
-      if (dx > 0 && dx < SPACING) return true;
+      if (dx > 0 && dx < SPACING + 0.5) return true;
+    }
+    return false;
+  };
+
+  /* Is there space for me in `lane` at my current x? Checks both directions,
+     since I would be dropping in alongside whoever is already there. */
+  Unit.prototype.laneHasRoom = function (lane) {
+    var list = this.battle.units;
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (o === this || o.dead || o.isPlayer !== this.isPlayer) continue;
+      if (o.lane !== lane) continue;
+      if (Math.abs(o.x - this.x) < SPACING) return false;
+    }
+    return true;
+  };
+
+  /* Move to whichever other depth row is emptiest and has space here.
+     Needed because rear-line units park a long way from the fight — an Archer
+     holds at 205px and a Monk stops to heal wherever it happens to be — and
+     enforceSpacing makes it impossible to overtake within a row. Without this, a
+     melee unit spawned into an Archer's row queues up behind it and never
+     reaches the enemy at all. */
+  Unit.prototype.trySidestep = function () {
+    var counts = [0, 0, 0], i;
+    for (i = 0; i < this.battle.units.length; i++) {
+      var o = this.battle.units[i];
+      if (o.dead || o.isPlayer !== this.isPlayer) continue;
+      counts[o.lane]++;
+    }
+    var order = [0, 1, 2]
+      .filter(function (l) { return l !== this.lane; }, this)
+      .sort(function (a, b) { return counts[a] - counts[b]; });
+    for (i = 0; i < order.length; i++) {
+      if (this.laneHasRoom(order[i])) {
+        this.lane = order[i];
+        this.sideCd = 1.4;   // no immediate second hop
+        this.blockT = 0;
+        return true;
+      }
     }
     return false;
   };
@@ -475,7 +587,7 @@
 
     if (def.healer) {
       var ally = this.healTarget;
-      if (ally && !ally.dead) ally.heal(def.heal);
+      if (ally && !ally.dead) ally.heal(this.healAmount);
       return;
     }
 
@@ -526,8 +638,17 @@
 
   Unit.prototype.update = function (dt) {
     var def = this.def;
+    var LAY = TS.LAY;
     this.flash = Math.max(0, this.flash - dt * 6);
-    this.push = TS.approach(this.push, 0, 34 * dt);
+    if (this.sideCd > 0) this.sideCd -= dt;
+    /* Net displacement since the last step, AFTER enforceSpacing had its say —
+       a unit being towed along behind a moving line still counts as moving. */
+    this.moved = (this.x - this.lastX) * this.dir;
+    this.lastX = this.x;
+    /* Ease between depth rows so a sidestep reads as filing across, not a jump. */
+    var rowY = LAY.lanes[this.lane];
+    if (this.feetY !== rowY) this.feetY = TS.approach(this.feetY, rowY, 120 * dt);
+    this.push = TS.approach(this.push, 0, 62 * dt);
     if (this.barShow > 0) this.barShow -= dt;
 
     if (this.state === 'die') {
@@ -570,11 +691,27 @@
     if (def.healer) {
       /* Monks hold behind the line and heal rather than engage. */
       this.healTarget = this.findHealTarget();
-      if (this.healTarget && this.atkTimer <= 0) { this.startAttack(); return; }
-      if (this.enemyAhead(def.keepDistance) || this.blockedByAlly()) {
+      if (this.healTarget) {
+        /* Someone in reach needs healing: plant and wait out the recharge rather
+           than wandering forward between casts. Advancing here made the Monk
+           break into a run the instant a heal finished, which read as though the
+           animation had glitched. */
+        if (this.atkTimer <= 0) { this.startAttack(); return; }
         this.setAnim('idle');
         return;
       }
+      if (this.enemyAhead(def.keepDistance)) {
+        this.blockT = 0;
+        this.setAnim('idle');
+        return;
+      }
+      if (this.blockedByAlly()) {
+        this.setAnim(this.moved > 0.15 ? 'run' : 'idle');
+        if (this.moved > 0.15) this.blockT = 0; else this.blockT += dt;
+        if (this.blockT > 0.7 && this.sideCd <= 0) this.trySidestep();
+        return;
+      }
+      this.blockT = 0;
       this.advance(dt);
       return;
     }
@@ -584,6 +721,9 @@
 
     /* 1. Strike anything within range — including from the second rank. */
     var target = this.findEnemy(def.range);
+    /* Artillery keeps the same fire gate but re-aims over the screen at whatever
+       is sheltering behind it, falling back to the normal target if nothing is. */
+    if (target && def.lob) target = this.findLobTarget(def.lob) || target;
     if (!target && castleDist <= def.range) target = castle;
     if (target && this.atkTimer <= 0) {
       this.target = target;
@@ -595,11 +735,18 @@
           ahead. Otherwise keep closing — units creep forward between swings,
           which is what makes the front line push toward whoever is losing
           instead of locking in place. */
-    if (this.findEnemy(def.contact) || castleDist <= def.contact ||
-        this.blockedByAlly()) {
+    if (this.findEnemy(def.contact) || castleDist <= def.contact) {
+      this.blockT = 0;
       this.setAnim('idle');
       return;
     }
+    if (this.blockedByAlly()) {
+      this.setAnim(this.moved > 0.15 ? 'run' : 'idle');
+      if (this.moved > 0.15) this.blockT = 0; else this.blockT += dt;
+      if (this.blockT > 0.7 && this.sideCd <= 0) this.trySidestep();
+      return;
+    }
+    this.blockT = 0;
     this.advance(dt);
   };
 
@@ -772,7 +919,22 @@
       if (u.dead || u.isPlayer === fromPlayer) continue;
       /* Horizontal distance only: the three depth rows are a drawing device, not
          real space, so a blast should catch a whole column of the front line. */
-      if (Math.abs(u.x - x) <= radius) u.hurt(dmg, null);
+      var d = Math.abs(u.x - x);
+      if (d > radius) continue;
+      u.hurt(dmg, null);
+      /* Real positional knockback, and the ONLY place it happens. A blast is a
+         rare, discrete event, so shoving survivors back reads well and its cost in
+         lost attack time is bounded. Per-swing knockback would instead make the
+         front gap oscillate, dropping the second rank in and out of reach and
+         turning the tuned two-rank damage model to mush.
+         Always backwards, never away from the blast centre — being pushed deeper
+         into the enemy line would be a nonsense outcome. enforceSpacing only ever
+         pushes units rearward, so it will not undo this. */
+      if (!u.dead) {
+        var falloff = 1 - d / radius;
+        u.x = TS.clamp(u.x - u.dir * (10 + 26 * falloff),
+          TS.LAY.laneLeft, TS.LAY.laneRight);
+      }
     }
     var base = fromPlayer ? this.enemyCastle : this.playerCastle;
     if (!base.dead && Math.abs(base.frontX - x) <= radius) {
@@ -792,7 +954,8 @@
     this.gold -= def.cost;
     this.stats.spent += def.cost;
     this.cooldowns[cls] = TS.cardCooldown(cls);
-    this.spawn(true, cls, 1);
+    /* Permanent upgrades bought with victory gold ride in as the spawn buff. */
+    this.spawn(true, cls, TS.Save.unitBuff(cls));
     TS.Audio.play('summon');
     return true;
   };
@@ -889,15 +1052,21 @@
        from behind the wall instead of standing on top of the masonry. The
        occlusion is per-pixel against the building sprite, which makes the reveal
        gradual rather than a hard cut. */
-    var behindPlayer = [], behindEnemy = [], field = [];
+    /* Within a gate group, a unit NEARER than the building still has to draw in
+       front of it — the bases stand on the middle depth row, so front-row units
+       pass in front of them while the back two rows pass behind. */
+    var behindPlayer = [], frontPlayer = [], behindEnemy = [], frontEnemy = [];
+    var field = [];
     for (i = 0; i < this.units.length; i++) {
       var u = this.units[i];
-      if (u.x < pGate) behindPlayer.push(u);
-      else if (u.x > eGate) behindEnemy.push(u);
+      if (u.x < pGate) (u.feetY > pc.y ? frontPlayer : behindPlayer).push(u);
+      else if (u.x > eGate) (u.feetY > ec.y ? frontEnemy : behindEnemy).push(u);
       else field.push(u);
     }
     behindPlayer.sort(byDepth);
+    frontPlayer.sort(byDepth);
     behindEnemy.sort(byDepth);
+    frontEnemy.sort(byDepth);
     field.sort(byDepth);
 
     /* Ground dust sits behind the buildings too, or spawn puffs smear across
@@ -906,17 +1075,21 @@
 
     drawGroup(ctx, behindPlayer);
     pc.draw(ctx);
+    drawGroup(ctx, frontPlayer);
     drawGroup(ctx, behindEnemy);
     ec.draw(ctx);
+    drawGroup(ctx, frontEnemy);
 
     drawGroup(ctx, field);
 
     for (i = 0; i < this.projectiles.length; i++) this.projectiles[i].draw(ctx);
 
     TS.FX.drawFront(ctx);
-    /* Only units clear of the gates get bars — a bar floating over a castle for
-       a unit you cannot see reads as a glitch. */
+    /* Bars for everything not hidden behind a building. Units in the gate groups
+       that draw IN FRONT of their base are fully visible, so they keep theirs. */
     for (i = 0; i < field.length; i++) field[i].drawBar(ctx);
+    for (i = 0; i < frontPlayer.length; i++) frontPlayer[i].drawBar(ctx);
+    for (i = 0; i < frontEnemy.length; i++) frontEnemy[i].drawBar(ctx);
   };
 
   TS.Unit = Unit;

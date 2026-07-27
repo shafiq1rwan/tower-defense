@@ -193,6 +193,10 @@ window.TS = window.TS || {};
     paper: { x: [12, 128, 256], w: [52, 64, 52], y: [20, 128, 256], h: [44, 64, 45] },
     paperSp: { x: [10, 128, 256], w: [54, 64, 54], y: [20, 128, 256], h: [44, 64, 43] },
     button: { x: [19, 128, 256], w: [45, 64, 45], y: [17, 128, 256], h: [47, 64, 47] },
+    /* The Pressed art is NOT the Regular art shifted — it is drawn wider and
+       squashed (caps 50px not 45, top rim 36px not 47). Slicing it with the
+       regular metrics reads from the wrong rows and crops its edges. */
+    buttonDown: { x: [14, 128, 256], w: [50, 64, 50], y: [28, 128, 256], h: [36, 64, 49] },
     wood: { x: [44, 192, 320], w: [84, 64, 84], y: [43, 192, 320], h: [85, 64, 103] },
     banner: { x: [28, 192, 320], w: [100, 64, 84], y: [60, 192, 320], h: [68, 64, 111] }
   };

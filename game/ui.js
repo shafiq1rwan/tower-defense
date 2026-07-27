@@ -117,6 +117,25 @@
       Math.round(w), Math.round(h));
   };
 
+  /* An icon and a number as one group centred on (cx, cy). Used for every purse
+     and price in the game: centring the pair keeps the icon clear of a ribbon's
+     tail and stays balanced whether the value is 72 or 1416. */
+  UI.coinAmount = function (ctx, value, cx, cy, o) {
+    o = o || {};
+    var size = o.size || 27;
+    var scale = o.scale || 0.72;
+    var key = o.icon || 'icon03';
+    var txt = String(value);
+    var iw = 64 * scale;
+    var lw = TS.textWidth(ctx, txt, size);
+    var half = (iw + lw) / 2;
+    UI.icon(ctx, key, cx - half + iw / 2, cy, scale);
+    TS.text(ctx, txt, cx - half + iw, cy, {
+      size: size, fill: o.fill || '#fff8e6', stroke: o.stroke || '#3a2418',
+      align: 'left'
+    });
+  };
+
   /* --------------------------------------------------------------- button -- */
 
   function Button(o) {
@@ -148,14 +167,21 @@
     var cy;
 
     if (k === 'big' || k === 'bigRed') {
-      var dy = down ? 3 : 0;
       var img = TS.img(k === 'big'
         ? (down ? 'btnBluePressed' : 'btnBlue')
         : (down ? 'btnRedPressed' : 'btnRed'));
-      TS.nineSlice(ctx, img, TS.SLICE.button, this.x, this.y + dy, this.w, this.h);
-      /* Stretched buttons: the 9-slice fills the rect exactly, so its own centre
-         is right. Nudged up 2px because the bottom lip is the thicker slice. */
-      cy = this.y + this.h / 2 - 2 + dy;
+      /* Each state gets its OWN measured metrics. The pressed sheet is squashed
+         with a thinner top rim, so it is also drawn a few pixels shorter and
+         lower — that, not a blanket offset, is what reads as "pushed in". */
+      if (down) {
+        TS.nineSlice(ctx, img, TS.SLICE.buttonDown,
+          this.x, this.y + 6, this.w, this.h - 6);
+        cy = this.y + this.h / 2 + 4;
+      } else {
+        TS.nineSlice(ctx, img, TS.SLICE.button, this.x, this.y, this.w, this.h);
+        /* Nudged up 2px because the bottom lip is the thicker slice. */
+        cy = this.y + this.h / 2 - 2;
+      }
     } else {
       var map = {
         sqBlue: ['sqBlue', 'sqBluePressed'],
@@ -166,8 +192,19 @@
       if (im) ctx.drawImage(im, Math.round(this.x - BTN_PAD_X), Math.round(this.y - BTN_PAD_Y));
       cy = this.y + (down ? FACE_CY_PRESSED : FACE_CY);
     }
-    if (this.icon) UI.icon(ctx, this.icon, cx, cy, this.iconScale);
-    if (this.label != null) {
+    /* Icon and label together lay out side by side as one centred group, rather
+       than both being drawn at the same point on top of each other. */
+    if (this.icon && this.label != null) {
+      var iw = 64 * this.iconScale;
+      var lw = TS.textWidth(ctx, this.label, this.labelSize);
+      var half = (iw + lw) / 2;
+      UI.icon(ctx, this.icon, cx - half + iw / 2, cy, this.iconScale);
+      TS.text(ctx, this.label, cx - half + iw, cy, {
+        size: this.labelSize, fill: '#fff8e6', stroke: '#2f4b52', align: 'left'
+      });
+    } else if (this.icon) {
+      UI.icon(ctx, this.icon, cx, cy, this.iconScale);
+    } else if (this.label != null) {
       TS.text(ctx, this.label, cx, cy, {
         size: this.labelSize, fill: '#fff8e6', stroke: '#2f4b52'
       });
@@ -223,19 +260,23 @@
     bar(ctx, x, y, w, h, frac, c[0], c[1]);
   };
 
-  /* Castle bar plus its numeric HP, as in the reference. */
+  /* Base bar plus its numeric HP.
+     Sized against the BUILDING, not the screen: both bases are only ~113px of
+     visible art, so the original 160x20 bar and 34px number towered over them.
+     Kept above the building rather than below it — the strip beneath is where the
+     front depth row walks, and a bar there would sit among the units. */
   UI.castleBar = function (ctx, castle) {
-    var w = 160, h = 20;
-    /* Keep the bar on screen even though the castle is cropped by the edge. */
-    var cx = TS.clamp(castle.x, 24 + w / 2, TS.W - 24 - w / 2);
+    var w = 108, h = 14;
+    /* Keep the bar on screen even when the building sits near the edge. */
+    var cx = TS.clamp(castle.x, 16 + w / 2, TS.W - 16 - w / 2);
     var x = Math.round(cx - w / 2);
-    /* Clear of the taller of the two buildings: the tower reaches 182px above its
-       foot line, which now sits on the middle depth row at y835. */
-    var y = 622;
+    /* Clear of the taller of the two: the tower reaches 182px above its foot
+       line, which sits on the middle depth row at y835. */
+    var y = 630;
     var frac = castle.barHp / castle.maxHp;
     var c = castle.isPlayer ? ALLY : FOE;
-    TS.text(ctx, Math.ceil(castle.hp), cx, y - 24, {
-      size: 34, fill: '#fff8e6', stroke: '#3a2418'
+    TS.text(ctx, Math.ceil(castle.hp), cx, y - 18, {
+      size: 25, fill: '#fff8e6', stroke: '#3a2418'
     });
     bar(ctx, x, y, w, h, frac, c[0], c[1]);
   };
@@ -430,15 +471,17 @@
     }
 
     /* --- top row ------------------------------------------------------- */
-    /* Content sits on the ribbon's coloured band, not its geometric middle. */
+    /* Content sits on the ribbon's coloured band, not its geometric middle, and
+       each icon+number pair is centred as a group so the icon never rides up on
+       the ribbon's tail. */
     var ribMid = 40 + UI.ribbonMid('small');
-    UI.smallRibbon(ctx, 18, 40, 196, UI.RIB.tealR);
-    UI.icon(ctx, 'icon03', 54, ribMid, 0.72);
-    TS.text(ctx, save.gold, 140, ribMid, { size: 27, fill: '#fff8e6', stroke: '#264448' });
+    UI.smallRibbon(ctx, 18, 40, 210, UI.RIB.tealR);
+    UI.coinAmount(ctx, save.gold, 123, ribMid, { size: 27, stroke: '#264448' });
 
-    UI.smallRibbon(ctx, 226, 40, 168, UI.RIB.yellowR);
-    UI.icon(ctx, 'icon05', 262, ribMid, 0.72);
-    TS.text(ctx, save.wins, 338, ribMid, { size: 27, fill: '#fff8e6', stroke: '#5a4410' });
+    UI.smallRibbon(ctx, 240, 40, 176, UI.RIB.yellowR);
+    UI.coinAmount(ctx, save.wins, 328, ribMid, {
+      size: 27, stroke: '#5a4410', icon: 'icon05'
+    });
 
     TS.text(ctx, 'Battle ' + (battle.level.index + 1), 676, 68, {
       size: 34, fill: '#fff8e6', stroke: '#3a2418', align: 'right'

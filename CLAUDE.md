@@ -1,0 +1,185 @@
+# CLAUDE.md
+
+Portrait lane-battler built on the Pixel Frog *Tiny Swords* art pack. Vanilla JS +
+Canvas 2D, no build step, no dependencies. Ships as an installable PWA.
+
+`README.md` is the player/deploy-facing doc and holds the full catalogue of
+art-pack measurements. This file is about **working in the repo**.
+
+## Run it
+
+```sh
+node serve.js          # http://localhost:8000/  — Python is NOT installed here
+node --check game/x.js # there is no linter or test runner; syntax-check like this
+```
+
+## Read this first: bump the service worker
+
+**After changing anything under `game/`, increment `VERSION` in `sw.js`.**
+
+`sw.js` is cache-first, so a stale build is served silently and you will debug
+code that is not running. This is not hypothetical — it cost real time once when
+the worker kept serving an old `levels.js` and the enemy went on spawning the
+previous faction after it had been replaced.
+
+When testing in a throwaway browser profile, delete the profile between runs
+rather than trusting the bump.
+
+## Measure the art; never infer it
+
+Every single visual bug in this project came from assuming sheet geometry. The
+pack is full of layouts that are *almost* what you would guess:
+
+- `Tilemap_Flat` columns are `[left edge, INTERIOR, right edge, 1-wide]` — one
+  interior column per material. The neighbouring column looks like plain fill but
+  carries a near-black outline, and tiling it paints a seam every 64px.
+- UI slice art is **inset** inside its cell. `BigBar_Base`'s end caps are 24px
+  wide, not 64. A button's Pressed sheet has different bounds from its Regular one.
+- A ribbon's coloured band is not its drawn height; a button's art box is not its
+  face; `*_Slots.png` are not tileable; both "shadow" files are grey squares.
+- Frame counts do not follow from image width. The Monk's `Heal` is 11 frames, the
+  `Clouds_*` files are single sprites, `Barrel_Red` is 128px frames not 192.
+
+So: **measure with a script, then hard-code the numbers with a comment saying they
+were measured.** Content bounds via `System.Drawing` in PowerShell works well, and
+rendering a sheet as a labelled grid is the fastest way to identify animation rows.
+Canvas is tainted under `file://`, so nothing can be sampled at runtime — colours
+like the terrain backing fills must be measured offline.
+
+`TS.SLICE` / `TS.THREE` in `gfx.js` hold the measured UI metrics. Add to those
+tables rather than passing ad-hoc offsets at call sites.
+
+## Invariants that are easy to break
+
+**Fixed timestep.** The sim advances only in 1/60s steps; fast-forward feeds it
+more steps per frame. Never let sim logic read wall-clock time, or 1x/2x/3x stop
+agreeing. UI animation deliberately uses a separate real-time clock (`uiClock`,
+`resultT`) so the interface stays calm while the battle is sped up.
+
+**Two ranks fight, and the balance depends on it.** Each unit closes to `contact`
+but strikes from `range`. `range` must exceed `contact + SPACING` so the second
+rank can reach over the front rank, and stay under `contact + 2*SPACING` so the
+third cannot. Measured participation: rank 0 attacks ~28% of frames, rank 1 ~21%,
+rank 2 exactly 0%. Touching `contact`, `range` or `SPACING` invalidates the tuned
+curve — re-run the balance sweep below.
+
+**The player's back line must stay reachable.** Everything targets its *nearest*
+enemy, and the nearest enemy is always the melee screen — so Archers and Monks, which
+hold 205 and 215 behind the clash, were structurally invulnerable. Measured: the
+Archer took 60 damage to the Warrior's 724 across a whole battle, so massing a back
+line won by default and upgrading it just won faster. The TNT goblin's `lob` is the
+sole counter, and it works only because of two separate things:
+
+- `findLobTarget` selects on **role** (ranged or healer), not distance. "Aim at the
+  deepest enemy" was the obvious rule and it is wrong — measured, it hit a Warrior on
+  11 of 11 shots, because the farthest player unit is usually a fresh reinforcement
+  still walking up from the tower.
+- `lob` is separate from the **fire gate**, which stays `findEnemy(def.range)`. If
+  `lob` also gated firing, every rank of artillery could shoot from the back; `range`
+  is what keeps it to two ranks.
+
+If you retarget TNT to `findEnemy`, widen `Archer.contact`, or drop `TNT.dmg` below a
+Monk's healing throughput, the exploit comes straight back and the sweep will still
+look fine on battles 1-7.
+
+**Field cap is 8 because only ~6 allies can reach.** Two ranks strike across three
+depth rows. At the old cap of 14 a full army spent 76% of its time waiting and the
+Warrior line attacked 7% of the time — slots 7-14 were decoration that read as a bug.
+Verified balance-neutral at caps 14 / 10 / 8, fresh and maxed. Raising it does not
+make the player stronger; it only lengthens the queue.
+
+**`enforceSpacing` only ever pushes rearward.** Two consequences: knocking a unit
+*backwards* is safe (it will not be yanked forward), and *overtaking within a depth
+row is impossible* — which is why blocked units sidestep to another row instead.
+
+**Positional vs cosmetic pushes.** `unit.push` is a draw-only flinch and must stay
+that way; it cannot affect reach or spacing. Real knockback happens in exactly one
+place, `Battle.detonate`, because a blast is rare and discrete. Per-swing knockback
+would make the front gap oscillate and drop the second rank in and out of range.
+
+**`file://` must keep working.** Hence classic `<script>` tags and a single global
+`TS` namespace — no ES modules. Keep it that way.
+
+**Every asset path goes through `encodeURI`.** The pack is full of spaces
+(`Pawn_Idle Knife.png`, `UI Elements/UI Elements/`).
+
+**Sprites are keyed by class alone** — each class belongs to exactly one faction
+(knights are the player, goblins the enemy), so there is no team dimension.
+
+## Verifying changes
+
+`TS.dev` exposes narrow hooks for driving and inspecting: `screen`, `battle`,
+`cards`, `title()`, `select()`, `start(i)`, `pause()`, `setSpeed(n)`,
+`summon(cls)`, `grantGold(n)`, `counts()`, and `fastSim(seconds, policyFn)`.
+
+`fastSim` runs the simulation with no rendering, so a whole battle resolves in a
+fraction of a second. Use it for balance work rather than watching battles.
+
+**Look at the pixels.** Most bugs here were visual and invisible to any assertion —
+seams, croppings, wrong occlusion, mis-centred glyphs. Drive a headless Chromium
+over CDP (Edge is installed), screenshot, and read the image. Crop and zoom;
+full-frame shots hide 5px errors. Capturing console messages and failed requests
+at the same time catches asset typos immediately.
+
+### The balance contract
+
+After touching any combat number, unit stat or wave script, confirm all four hold.
+A sweep over 8 battles x 4 policies takes seconds with `fastSim`.
+
+| Policy | Fresh save | Fully upgraded |
+|---|---|---|
+| Buy the most expensive affordable unit | 6-7 of 8, **fails battle 8** | wins all 8 |
+| Sensible mixed composition | wins 7, **fails battle 8** | wins all 8 |
+| Archer + Pawn only | ~3 of 8 | ~7 of 8 |
+| Pawn spam only | ~1 of 8 | ~3 of 8 |
+| Do nothing | **loses** all 8 |  |
+
+**Battle 8 is deliberately the wall that the Barracks exists for.** No policy beats
+it on a fresh save; upgrades are what open it. Since a flawless run of battles 1-7
+banks enough gold for a meaningful slice of training, a normal player arrives with
+the upgrades they need — the gate is a curve, not a brick wall. If a fresh save ever
+starts clearing battle 8, the campaign has lost its only difficulty ceiling.
+
+The bot policies are a **floor, not a ceiling**: they never retreat, re-time a heal,
+or react, so a human plays strictly better than these numbers. Do not tune to make a
+bot win; tune the shape of the curve.
+
+Also check no battle ends `unresolved` — every battle must resolve, which is what the
+per-level `timeLimit` guarantees.
+
+Sweep **twice**: once on a fresh save, and once with every class maxed in the
+Barracks (`d.upg[cls] = Save.MAX_UPG`). A fresh save must reproduce the baseline
+exactly, since level 0 is a 1.00 multiplier — if it does not, something is reading
+upgrade state it should not.
+
+**Single runs near a win/lose boundary are not a signal.** The policies are crude and
+deterministic, so one unit dying a second earlier cascades through everything it
+could afford next. A sweep of TNT damage at 11 / 20 / 26 / 34 produced a
+*non-monotonic* result — 26 lost two battles that 34 won at full HP. Derive combat
+numbers from something structural (see the Monk-throughput argument on `TNT.dmg`) and
+use the sweep to confirm the shape, never to pick the value.
+
+### Deploying
+
+Hosted on GitHub Pages, which serves from **Linux and is case-sensitive** while
+this machine is not. A wrong-case path works locally and 404s live. Verify every
+requested URL against the real filenames before deploying — the asset folders have
+a lot of capitals (`Factions/Goblins/Troops/...`).
+
+Keep all paths **relative** so the app works under a project subpath.
+
+## Layout notes
+
+Logical canvas is 832x1472 (13x23 tiles of 64px), all art drawn at 1:1 and the
+whole canvas scaled once. `TS.LAY` in `terrain.js` is the single source of truth for
+every band — sand lane, depth rows, base and spawn positions. Read it rather than
+hard-coding y values.
+
+Filtering is chosen in **device** pixels, not CSS pixels: a phone at dpr 3 shows a
+0.47x CSS scale but is really magnifying, and picking smooth filtering there would
+blur the art needlessly.
+
+## Scope
+
+Do not add build tooling, frameworks or a package manager. The whole point is that
+this folder is the deployable artifact.

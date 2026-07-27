@@ -29,6 +29,11 @@
   var titleBases = [];
   var confirmingReset = false;
 
+  /* Result-screen award animation. Driven by real time, not sim time, so the
+     swords land at the same pace whatever speed the battle was running at. */
+  var resultT = 0, resultStars = 0, starsRung = 0;
+  var STAR_DELAY = 0.3, STAR_GAP = 0.34, STAR_POP = 0.34;
+
   /* Level rows use the 103px big ribbon, not the 54px small one: at the CSS scale
      a phone renders this canvas at, 54 logical px is only ~25 device-independent
      pixels — far under a comfortable touch target. */
@@ -245,9 +250,11 @@
     });
     TS.text(ctx, save.cleared + ' of ' + TS.Levels.count + ' battles cleared',
       TS.W / 2, d.y + 166, { size: 24, fill: '#7a6248', stroke: null });
-    TS.text(ctx, save.gold + ' gold earned', TS.W / 2, d.y + 206, {
-      size: 24, fill: '#7a6248', stroke: null
-    });
+    var levels = TS.CLASSES.reduce(function (n, c) {
+      return n + TS.Save.upgradeLevel(c);
+    }, 0);
+    TS.text(ctx, save.gold + ' gold and ' + levels + ' upgrades',
+      TS.W / 2, d.y + 206, { size: 24, fill: '#7a6248', stroke: null });
     TS.text(ctx, 'It cannot be undone.', TS.W / 2, d.y + 262, {
       size: 22, fill: '#9a7a5a', stroke: null
     });
@@ -268,9 +275,129 @@
       })(i);
     }
     buttons.push(new TS.UI.Button({
-      x: 256, y: 1216, w: 320, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 38,
+      x: 52, y: 1216, w: 340, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 30,
+      onTap: goShop
+    }));
+    buttons.push(new TS.UI.Button({
+      x: 440, y: 1216, w: 340, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 34,
       onTap: goTitle
     }));
+  }
+
+  /* ---------------------------------------------------------------- shop -- */
+
+  var SHOP_TOP = 330, SHOP_PITCH = 150, SHOP_X = 40, SHOP_W = 752;
+
+  /* Measured ink height above each class's foot anchor, used to centre the shop
+     portraits. Sprites differ a lot: a Monk's art is 70px tall over its anchor
+     while a Lancer's raised pike reaches 154px. */
+  var SHOP_ART_H = { Pawn: 71, Warrior: 87, Archer: 87, Monk: 70, Lancer: 154 };
+
+  function goShop() {
+    screen = 'shop';
+    buttons = [];
+    TS.CLASSES.forEach(function (cls, i) {
+      if (TS.Save.upgradeCost(cls) <= 0) return;   // maxed: row shows MAX, no button
+      var rowY = SHOP_TOP + i * SHOP_PITCH;
+      buttons.push(new TS.UI.Button({
+        /* Height must be at least SLICE.button's 94px minimum. Declaring it
+           smaller made nineSlice clamp the ART to 94 while the label centred on
+           the shorter rect, putting the text 11px above the real centre. */
+        x: SHOP_X + SHOP_W - 170, y: rowY + 19, w: 150, h: 94,
+        kind: 'big', id: 'buy:' + cls,
+        icon: 'icon03', iconScale: 0.5,
+        label: String(TS.Save.upgradeCost(cls)),
+        labelSize: 27,
+        enabled: TS.Save.canAfford(cls),
+        onTap: function () {
+          if (TS.Save.buyUpgrade(cls)) {
+            TS.Audio.play('coin');
+            goShop();          // rebuild: costs, levels and affordability all move
+          } else {
+            TS.Audio.play('deny');
+          }
+        }
+      }));
+    });
+    buttons.push(new TS.UI.Button({
+      x: 256, y: 1216, w: 320, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 38,
+      onTap: goSelect
+    }));
+  }
+
+  function drawShop() {
+    var UI = TS.UI;
+    var save = TS.Save.get();
+
+    ctx.fillStyle = 'rgba(14,22,19,0.58)';
+    ctx.fillRect(0, 0, TS.W, TS.H);
+    UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal, 'BARRACKS',
+      { size: 42, stroke: '#25404a' });
+
+    /* Purse, so the cost on every row can be judged against it. Coin and number
+       are laid out as one group centred on the ribbon, which keeps the coin clear
+       of the left tail and stays balanced whatever the digit count. */
+    var pw = 260, px = (TS.W - pw) / 2;
+    UI.smallRibbon(ctx, px, 244, pw, UI.RIB.yellowR);
+    UI.coinAmount(ctx, save.gold, px + pw / 2, 244 + UI.ribbonMid('small'), {
+      size: 27, stroke: '#5a4410'
+    });
+
+    TS.CLASSES.forEach(function (cls, i) {
+      var def = TS.UNIT_DEFS[cls];
+      var rowY = SHOP_TOP + i * SHOP_PITCH;
+      var lv = TS.Save.upgradeLevel(cls);
+      var maxed = lv >= TS.Save.MAX_UPG;
+
+      UI.panel(ctx, 'paper', SHOP_X, rowY, SHOP_W, 132);
+
+      /* Live idle frame — the same art the card uses, so the row is identifiable
+         at a glance rather than by name alone.
+         Centred on the row by its MEASURED ink height above the foot anchor;
+         parking the feet near the row's bottom edge instead leaves every portrait
+         sitting low, and by a different amount per class. */
+      var spr = TS.SPR.unit[cls].idle;
+      var artScale = cls === 'Lancer' ? 0.62 : 0.9;
+      var feetY = rowY + 66 + (SHOP_ART_H[cls] * artScale) / 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(SHOP_X + 8, rowY + 4, 130, 124);
+      ctx.clip();
+      TS.drawFrame(ctx, spr, (uiClock * def.fps.idle) | 0,
+        SHOP_X + 74, feetY, { scale: artScale });
+      ctx.restore();
+
+      /* Two text lines centred as a pair on the row's middle. */
+      var textX = SHOP_X + 152;
+      TS.text(ctx, def.name, textX, rowY + 48, {
+        size: 27, fill: '#4a3628', stroke: null, align: 'left'
+      });
+
+      /* Level pips sit beside the name, on the same line, so the row reads as one
+         sentence rather than three stacked fragments. */
+      var pipX = textX + TS.textWidth(ctx, def.name, 27) + 20;
+      for (var p = 0; p < TS.Save.MAX_UPG; p++) {
+        ctx.save();
+        ctx.globalAlpha = p < lv ? 1 : 0.2;
+        UI.icon(ctx, 'icon05', pipX + p * 30, rowY + 47, 0.42);
+        ctx.restore();
+      }
+
+      /* Phrased as what the purchase BUYS, not the bonus already held — "+0%
+         health and power" on an untrained class tells the player nothing. */
+      var pct = Math.round((maxed ? lv : lv + 1) * 12);
+      TS.text(ctx, (maxed ? 'Fully trained — +' : 'Train to +') +
+        pct + '% health and power',
+        textX, rowY + 86, {
+          size: 19, fill: '#7a6248', stroke: null, align: 'left'
+        });
+
+      if (maxed) {
+        TS.text(ctx, 'MAX', SHOP_X + SHOP_W - 95, rowY + 66, {
+          size: 28, fill: '#8a7250', stroke: null
+        });
+      }
+    });
   }
 
   function startBattle(index) {
@@ -342,23 +469,28 @@
     var hpFrac = battle.playerCastle.hp / battle.playerCastle.maxHp;
     var reward = won ? TS.Levels.reward(battleIndex, hpFrac) : 0;
     battle.reward = reward;
+    /* Rated on THIS run, not the saved best, so the award reflects what just
+       happened rather than a better attempt from earlier. */
+    resultStars = won ? TS.Save.starsForFrac(hpFrac) : 0;
+    resultT = 0;
+    starsRung = 0;
     if (won) TS.Save.recordWin(battleIndex, hpFrac, reward);
 
     var hasNext = battleIndex + 1 < TS.Levels.count;
     buttons = [];
     if (won && hasNext) {
       buttons.push(new TS.UI.Button({
-        x: 146, y: 812, w: 250, h: 120, kind: 'big', label: 'NEXT', labelSize: 32,
+        x: 146, y: 862, w: 250, h: 120, kind: 'big', label: 'NEXT', labelSize: 32,
         onTap: function () { startBattle(battleIndex + 1); }
       }));
     } else {
       buttons.push(new TS.UI.Button({
-        x: 146, y: 812, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 32,
+        x: 146, y: 862, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 32,
         onTap: function () { startBattle(battleIndex); }
       }));
     }
     buttons.push(new TS.UI.Button({
-      x: 436, y: 812, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
+      x: 436, y: 862, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
       onTap: goSelect
     }));
   }
@@ -385,6 +517,15 @@
     if (hud) {
       for (var i = 0; i < hud.cards.length; i++) hud.cards[i].update(dt);
       if (hud.hintT > 0) hud.hintT -= dt;
+    }
+
+    if (resultShown) {
+      resultT += dt;
+      var landed = Math.floor((resultT - STAR_DELAY) / STAR_GAP) + 1;
+      while (starsRung < Math.min(landed, resultStars)) {
+        starsRung++;
+        TS.Audio.play('coin');
+      }
     }
 
     render();
@@ -428,6 +569,8 @@
       if (confirmingReset) drawResetConfirm();
     } else if (screen === 'select') {
       drawSelect();
+    } else if (screen === 'shop') {
+      drawShop();
     }
 
     for (var i = 0; i < buttons.length; i++) {
@@ -608,11 +751,64 @@
       TS.W / 2, d.y + 158, { size: 22, fill: '#7a6248', stroke: null });
   }
 
+  /* Three sword slots that land one at a time, so the rating is something the
+     player watches being awarded rather than a number that was already there.
+     Empty slots stay visible and dim, which is what makes 2-of-3 read as "one
+     more to earn" instead of just "two swords". */
+  function drawAward(d) {
+    var UI = TS.UI;
+    var cx = d.x + d.w / 2;
+    var y = d.y + 256;
+    var gap = 74;
+
+    for (var i = 0; i < 3; i++) {
+      var x = cx + (i - 1) * gap;
+      var earned = i < resultStars;
+      /* Progress of this slot's pop, 0 before its turn and 1 once settled. */
+      var t = TS.clamp((resultT - STAR_DELAY - i * STAR_GAP) / STAR_POP, 0, 1);
+
+      /* Empty socket, always drawn so the total is legible. */
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      UI.icon(ctx, 'icon05', x, y, 0.62);
+      ctx.restore();
+
+      if (!earned || t <= 0) continue;
+
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+      /* Overshoot, plus a flash of scale on the first frames, so each sword
+         arrives with a bit of weight. */
+      var s = 0.62 * (1.35 - 0.35 * TS.easeOutCubic(t)) * TS.easeOutBack(t);
+      ctx.scale(s / 0.62, s / 0.62);
+      UI.icon(ctx, 'icon05', 0, 0, 0.62);
+      ctx.restore();
+
+      if (t < 0.5) {
+        /* Brief burst behind the sword as it lands. */
+        ctx.save();
+        ctx.globalAlpha = (1 - t * 2) * 0.55;
+        ctx.fillStyle = '#ffe9a8';
+        ctx.beginPath();
+        ctx.arc(x, y, 26 + t * 34, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    var label = resultStars >= 3 ? 'Flawless!'
+      : resultStars === 2 ? 'Well fought' : 'Held the line';
+    ctx.save();
+    ctx.globalAlpha = TS.clamp((resultT - STAR_DELAY - 3 * STAR_GAP) / 0.3, 0, 1);
+    TS.text(ctx, label, cx, y + 54, { size: 24, fill: '#6b5238', stroke: null });
+    ctx.restore();
+  }
+
   function drawResult() {
     var UI = TS.UI;
     var won = battle.over === 'win';
     var d = UI.dialog(ctx, {
-      w: 640, h: 700, y: 360,
+      w: 640, h: 780, y: 336,
       title: won ? 'VICTORY!' : 'DEFEAT',
       titleRow: won ? UI.PLATE.teal : UI.PLATE.red
     });
@@ -621,12 +817,13 @@
       /* Drawn at native 256 rather than scaled down: the portrait only occupies
          about 196x182 of its frame, so shrinking it makes the face unreadable. */
       var avatar = TS.img(TS.avatarKey('Blue', 'Warrior'));
-      if (avatar) ctx.drawImage(avatar, Math.round(TS.W / 2 - 128), Math.round(d.y + 34));
+      if (avatar) ctx.drawImage(avatar, Math.round(TS.W / 2 - 128), Math.round(d.y + 16));
+      drawAward(d);
     } else {
       /* The Goblin faction ships no portraits, so the victor takes the stage in
          person — a Torch goblin, idling and pleased with itself. */
       var gob = TS.SPR.unit.Torch.idle;
-      TS.drawFrame(ctx, gob, (uiClock * 8) | 0, TS.W / 2, d.y + 250,
+      TS.drawFrame(ctx, gob, (uiClock * 8) | 0, TS.W / 2, d.y + 280,
         { scale: 1.6, flip: true });
     }
 
@@ -636,7 +833,7 @@
       ['Castle remaining',
         Math.round(100 * battle.playerCastle.hp / battle.playerCastle.maxHp) + '%']
     ];
-    var ry = d.y + 280;
+    var ry = d.y + 344;
     for (var i = 0; i < rows.length; i++) {
       TS.text(ctx, rows[i][0], d.x + 74, ry + i * 38, {
         size: 23, fill: '#6b5238', stroke: null, align: 'left'
@@ -647,13 +844,13 @@
     }
 
     if (won) {
-      UI.icon(ctx, 'icon03', d.x + d.w / 2 - 62, ry + 132, 0.6);
-      TS.text(ctx, '+' + battle.reward, d.x + d.w / 2 + 26, ry + 133, {
+      UI.icon(ctx, 'icon03', d.x + d.w / 2 - 62, d.y + 470, 0.6);
+      TS.text(ctx, '+' + battle.reward, d.x + d.w / 2 + 26, d.y + 470, {
         size: 32, fill: '#ffd257', stroke: '#5a3a12'
       });
     } else {
       TS.text(ctx, battle.byTimeout ? 'Time ran out.' : 'The castle has fallen.',
-        TS.W / 2, ry + 130, { size: 24, fill: '#7a6248', stroke: null });
+        TS.W / 2, d.y + 470, { size: 24, fill: '#7a6248', stroke: null });
     }
   }
 
