@@ -66,7 +66,35 @@ and massing Archers behind a wall — the strongest-looking play, since they kil
 safety — is exactly what the TNT goblins are built to punish. The later battles want a
 screen, ranged damage *and* a healer keeping the back line alive.
 
+### Every battle is a different place
+
+The eight battles do not share a backdrop. Each has a **theme** (`game/themes.js`)
+setting its ground palette, weather, water and how much wildlife is about, and the
+campaign darkens as it escalates:
+
+| Battle | | |
+|---|---|---|
+| 1 | Green Meadow | bright pasture, grazing sheep, drifting cloud |
+| 2 | Riverside | a river across the field — surf, rocks, a rubber duck |
+| 3 | Windy Highland | racing cloud and leaves blowing across |
+| 4 | Grey Downpour | rain, dry olive ground, the sheep have gone |
+| 5 | Still Marsh | teal water and hanging mist, dead stumps |
+| 6 | Last Light | low golden sun, dust hanging in the air |
+| 7 | Thunderhead | heavy slanting rain and lightning |
+| 8 | Goblin Camp | night, embers rising off the camp |
+
+The **sand lane never changes**, in any theme. It is gameplay: the two-rank combat
+model is tuned around it and units must have walkable ground in all three depth
+rows, so water is always a band in the upper field and never anything a unit could
+be asked to cross. Weather and the time-of-day wash draw in front of the units but
+inside the world transform, so they colour the battle and never the HUD.
+
 ### The Barracks
+
+Each battle is rated out of three swords, on **how much of your tower survived**:
+above 85% earns three, above 50% earns two, anything less earns one. The rule is
+printed on the result panel under your tower percentage and above the battle list, so
+it does not have to be guessed at. Thresholds live in `Save.STAR_AT`.
 
 Winning a battle pays out gold, scaled by how intact your tower is. Spend it in the
 **Barracks** (from the battle-select screen) on permanent training: three levels per
@@ -99,6 +127,7 @@ game/
   assets.js         manifest, loader, sprite registry
   audio.js          procedural WebAudio SFX (the pack ships no audio)
   save.js           localStorage progress
+  themes.js         per-battle palette, weather, water and wildlife
   terrain.js        grass field + sand lane, pre-rendered once
   scene.js          animated scenery and cloud drift
   fx.js             particles, floating numbers, screen shake

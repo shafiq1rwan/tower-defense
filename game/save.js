@@ -79,10 +79,17 @@
   };
 
   /* Rating thresholds live here alone, so the result screen and the battle-select
-     list can never disagree about what a run was worth. */
+     list can never disagree about what a run was worth.
+     Exposed as data rather than inlined into the comparison below because the UI
+     now SHOWS the rule to the player — a hard-coded "85%" in a label would drift
+     silently the first time these are retuned. Fraction of tower HP remaining
+     needed for 3 swords, then for 2; anything less is 1. */
+  var STAR_AT = [0.85, 0.5];
+  Save.STAR_AT = STAR_AT;
+
   Save.starsForFrac = function (hpFrac) {
     if (!hpFrac) return 0;
-    return hpFrac >= 0.85 ? 3 : hpFrac >= 0.5 ? 2 : 1;
+    return hpFrac >= STAR_AT[0] ? 3 : hpFrac >= STAR_AT[1] ? 2 : 1;
   };
 
   Save.stars = function (battleIndex) {

@@ -61,13 +61,13 @@
   TS.LAY = LAY;
 
   /* Measured averages of the interior cells — a file:// canvas is tainted, so
-     pixels cannot be sampled at runtime. */
-  var GRASS = '#98b358';
+     pixels cannot be sampled at runtime. The grass backing colour now comes from
+     the level's theme (see themes.js); only the sand is fixed here, because the
+     lane is gameplay and never varies. */
   var SAND = '#f0e07f';
 
   /* The single interior column of each material. Variation comes from random
      mirroring, not from a second column — see the header note. */
-  var GRASS_COL = 1, GRASS_ROW = 1;
   var SAND_COL = 6;
 
   var Terrain = { canvas: null };
@@ -87,10 +87,18 @@
     g.restore();
   }
 
-  Terrain.build = function (seed) {
+  Terrain.build = function (seed, theme) {
     var W = TS.W, H = TS.H;
     var rnd = TS.rng(seed || 1337);
     var ground = TS.img('ground');
+
+    theme = theme || TS.defaultTheme();
+    Terrain.theme = theme;
+    /* Per-theme grass palette. The SAND always comes from Tilemap_Flat, whatever
+       the theme: the alternate tilesets carry no sand at all, and the lane is
+       gameplay rather than dressing. */
+    var pal = TS.groundOf(theme);
+    var grassImg = TS.img(pal.img) || ground;
 
     var cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
@@ -98,13 +106,32 @@
     g.imageSmoothingEnabled = false;
 
     /* --- grass field over the whole screen ------------------------------- */
-    g.fillStyle = GRASS;
+    g.fillStyle = pal.fill;
     g.fillRect(0, 0, W, H);
     for (var y = 0; y < H; y += T) {
       for (var x = 0; x < W; x += T) {
         /* Mirroring breaks up the repeat without introducing a seam: the interior
            cell carries only organic texture, no directional edge features. */
-        blitCell(g, ground, GRASS_COL, GRASS_ROW, x, y, rnd() < 0.5, rnd() < 0.5);
+        blitCell(g, grassImg, pal.col, pal.row, x, y, rnd() < 0.5, rnd() < 0.5);
+      }
+    }
+
+    /* --- water band, upper field only ------------------------------------ */
+    /* Baked because the surface itself does not animate — Water.png is one flat
+       tile. All the motion is the foam ring and water rocks, which scene.js draws
+       on top. The hard band edges are meant to be hidden by that foam. */
+    if (theme.water) {
+      var wy0 = theme.water.y0, wy1 = theme.water.y1;
+      g.fillStyle = TS.WATER_FILL;
+      g.fillRect(0, wy0, W, wy1 - wy0);
+      var wimg = TS.img('water');
+      if (wimg) {
+        for (var wy = wy0; wy < wy1; wy += T) {
+          for (var wx = 0; wx < W; wx += T) {
+            var hLeft = Math.min(T, wy1 - wy);
+            g.drawImage(wimg, 0, 0, T, hLeft, wx, wy, T, hLeft);
+          }
+        }
       }
     }
 
@@ -129,7 +156,7 @@
       blitCell(g, ground, SAND_COL, 3, px, 960, rnd() < 0.5, false);
     }
 
-    bakeStaticDecor(g, rnd);
+    bakeStaticDecor(g, rnd, theme);
 
     /* Very soft darkening at the top so HUD plates always have contrast. */
     var top = g.createLinearGradient(0, 0, 0, 240);
@@ -144,14 +171,20 @@
   /* Anything that never animates belongs in the baked layer. Everything is
      collected first and drawn in base-Y order, so a nearer pebble is never
      painted underneath a further one. */
-  function bakeStaticDecor(g, rnd) {
+  function bakeStaticDecor(g, rnd, theme) {
     var D = TS.SPR.decor;
     var props = D.props || [];
     var queue = [];
     var i;
 
+    /* Nothing may be baked inside a water band or its foam margin, or pebbles and
+       mushrooms end up floating on the lake. */
+    var dry = TS.dryOf(theme);
+
     function add(spr, x, y, alpha) {
-      if (spr) queue.push({ spr: spr, x: x, y: y, flip: rnd() < 0.5, alpha: alpha });
+      if (spr && dry(y)) {
+        queue.push({ spr: spr, x: x, y: y, flip: rnd() < 0.5, alpha: alpha });
+      }
     }
 
     var rockSpots = [
@@ -161,8 +194,16 @@
     for (i = 0; i < rockSpots.length; i++) {
       add(D.rock[(rnd() * 4) | 0], rockSpots[i][0], rockSpots[i][1]);
     }
-    add(D.stump[(rnd() * 4) | 0], 706, 560);
-    add(D.stump[(rnd() * 4) | 0], 120, 606);
+
+    /* Stumps read as cleared or dead woodland, so the darker themes ask for more
+       of them. Spots are fixed; the theme only decides how many are used. */
+    var stumpSpots = [
+      [706, 560], [120, 606], [452, 596], [268, 636], [612, 328]
+    ];
+    var nStumps = theme && theme.stumps != null ? theme.stumps : 2;
+    for (i = 0; i < Math.min(nStumps, stumpSpots.length); i++) {
+      add(D.stump[(rnd() * 4) | 0], stumpSpots[i][0], stumpSpots[i][1]);
+    }
 
     /* Scatter props (mushrooms, tufts, pebbles, a bone) across the grass, and a
        sparse few on the sand — the reference dresses its lane lightly too. */

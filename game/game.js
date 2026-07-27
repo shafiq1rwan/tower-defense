@@ -91,8 +91,8 @@
       screen = 'error';
       return;
     }
-    TS.Terrain.build(1337);
-    TS.Scene.build(1337);
+    TS.Terrain.build(1337, TS.defaultTheme());
+    TS.Scene.build(1337, TS.defaultTheme());
     buildTitleUnits();
     goTitle();
   }
@@ -199,11 +199,22 @@
 
   /* --------------------------------------------------------------- screens -- */
 
+  /* The menus share the battlefield as a backdrop, so after a stormy battle they
+     would still be dark and raining. Put the calm theme back — but only when it is
+     not already current, since this re-tiles the whole 832x1472 terrain canvas. */
+  function useDefaultBackdrop() {
+    var theme = TS.defaultTheme();
+    if (TS.Terrain.theme === theme) return;
+    TS.Terrain.build(1337, theme);
+    TS.Scene.build(1337, theme);
+  }
+
   function goTitle() {
     screen = 'title';
     paused = false;
     confirmingReset = false;
     battle = null;
+    useDefaultBackdrop();
     buttons = [
       new TS.UI.Button({
         x: 256, y: 980, w: 320, h: 140, kind: 'big', label: 'PLAY', labelSize: 44,
@@ -262,6 +273,7 @@
 
   function goSelect() {
     screen = 'select';
+    useDefaultBackdrop();
     buttons = [];
     var n = TS.Levels.count;
     for (var i = 0; i < n; i++) {
@@ -407,10 +419,13 @@
 
     TS.FX.reset();
     battle = new TS.Battle(level);
-    /* Fresh scenery seed per battle so the eight levels do not look identical,
-       while still being stable across replays of the same one. */
-    TS.Terrain.build(1000 + index * 37);
-    TS.Scene.build(1000 + index * 37);
+    /* Each battle gets its own THEME — palette, weather, water, how much life is
+       about — plus a per-level seed so the scatter differs too. The seed alone was
+       not enough: a different arrangement of the same props on the same green
+       still read as the same place eight times over. */
+    var theme = TS.themeFor(index);
+    TS.Terrain.build(1000 + index * 37, theme);
+    TS.Scene.build(1000 + index * 37, theme);
 
     speed = 1;
     paused = false;
@@ -558,6 +573,10 @@
     } else if (screen === 'title') {
       drawTitleUnits(lastDt);
     }
+    /* Weather and the time-of-day wash sit in FRONT of the units but still inside
+       the world transform, so they colour the battle without ever touching the
+       HUD, cards or dialogs drawn after the restore below. */
+    TS.Scene.drawFront(ctx);
     ctx.restore();
 
     if (screen === 'battle') {
@@ -695,6 +714,13 @@
     ctx.fillRect(0, 0, TS.W, TS.H);
     UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal, 'CHOOSE A BATTLE',
       { size: 42, stroke: '#25404a' });
+    /* Legend for the sword columns below. Sits in the gap between the ribbon and
+       the first row, so it explains the swords before you scan them rather than
+       after. The big ribbon art is 103px tall from y130, so it ends at 233 and the
+       first row starts at SELECT_TOP (284) — y256 is the clear air between. */
+    TS.text(ctx, starRuleText(), TS.W / 2, 256, {
+      size: 19, fill: '#e2d6bd', stroke: '#26332c'
+    });
   }
 
   /* Rows are drawn after the buttons so the labels sit on top of the ribbon. */
@@ -755,14 +781,35 @@
      player watches being awarded rather than a number that was already there.
      Empty slots stay visible and dim, which is what makes 2-of-3 read as "one
      more to earn" instead of just "two swords". */
+  /* What earns three swords was never stated anywhere: the result panel showed the
+     swords and the tower percentage as two unrelated facts, and battle-select showed
+     a row of swords with no legend. Built from Save.STAR_AT so the sentence cannot
+     drift away from the thresholds it describes, and used by BOTH screens so they
+     cannot word it differently. */
+  function starRuleText() {
+    var at = TS.Save.STAR_AT;
+    /* "%+" rather than "above 85%": the test is >=, so 85% exactly earns three and
+       "above" would be a lie about the boundary. It is shorter too. */
+    return 'Tower ' + Math.round(at[0] * 100) + '%+ = 3 swords   ·   ' +
+      Math.round(at[1] * 100) + '%+ = 2';
+  }
+
+  /* The swords are the reward, so they are the biggest thing on the panel after
+     the title. Everything else here is derived from this one number: the spacing
+     has to grow with it or the three collide, and the landing burst and the label
+     below have to follow it or they detach from the art.
+     Vertical room is the real limit — the stats rows start at d.y+344 and the
+     sword row is centred at d.y+256, so the label has to fit in between. */
+  var SWORD_SCALE = 0.9;          // icon05 is 64px, so ~58px drawn
+  var SWORD_GAP = 104;            // centre to centre; ~46px of air between swords
+
   function drawAward(d) {
     var UI = TS.UI;
     var cx = d.x + d.w / 2;
     var y = d.y + 256;
-    var gap = 74;
 
     for (var i = 0; i < 3; i++) {
-      var x = cx + (i - 1) * gap;
+      var x = cx + (i - 1) * SWORD_GAP;
       var earned = i < resultStars;
       /* Progress of this slot's pop, 0 before its turn and 1 once settled. */
       var t = TS.clamp((resultT - STAR_DELAY - i * STAR_GAP) / STAR_POP, 0, 1);
@@ -770,27 +817,30 @@
       /* Empty socket, always drawn so the total is legible. */
       ctx.save();
       ctx.globalAlpha = 0.18;
-      UI.icon(ctx, 'icon05', x, y, 0.62);
+      UI.icon(ctx, 'icon05', x, y, SWORD_SCALE);
       ctx.restore();
 
       if (!earned || t <= 0) continue;
 
-      ctx.save();
-      ctx.translate(Math.round(x), Math.round(y));
       /* Overshoot, plus a flash of scale on the first frames, so each sword
-         arrives with a bit of weight. */
-      var s = 0.62 * (1.35 - 0.35 * TS.easeOutCubic(t)) * TS.easeOutBack(t);
-      ctx.scale(s / 0.62, s / 0.62);
-      UI.icon(ctx, 'icon05', 0, 0, 0.62);
-      ctx.restore();
+         arrives with a bit of weight. Scaled through UI.icon rather than a canvas
+         transform: icon05's ink sits 1-2px off-centre in its frame and UI.icon
+         corrects for that PROPORTIONALLY to the scale, so wrapping it in a
+         transform applied that correction twice and the sword drifted as it grew. */
+      var pop = (1.35 - 0.35 * TS.easeOutCubic(t)) * TS.easeOutBack(t);
+      UI.icon(ctx, 'icon05', x, y, SWORD_SCALE * pop);
 
       if (t < 0.5) {
-        /* Brief burst behind the sword as it lands. */
+        /* Flash OVER the sword as it lands — drawn after it, despite what this
+           comment used to claim. It works because the two are anti-phased: the
+           flash is brightest at t=0 when the sword's own scale is still 0, so the
+           sword reads as emerging out of it. Sized off SWORD_SCALE so the two stay
+           related if the scale is retuned again. */
         ctx.save();
         ctx.globalAlpha = (1 - t * 2) * 0.55;
         ctx.fillStyle = '#ffe9a8';
         ctx.beginPath();
-        ctx.arc(x, y, 26 + t * 34, 0, Math.PI * 2);
+        ctx.arc(x, y, (26 + t * 34) * (SWORD_SCALE / 0.62), 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -800,7 +850,7 @@
       : resultStars === 2 ? 'Well fought' : 'Held the line';
     ctx.save();
     ctx.globalAlpha = TS.clamp((resultT - STAR_DELAY - 3 * STAR_GAP) / 0.3, 0, 1);
-    TS.text(ctx, label, cx, y + 54, { size: 24, fill: '#6b5238', stroke: null });
+    TS.text(ctx, label, cx, y + 68, { size: 24, fill: '#6b5238', stroke: null });
     ctx.restore();
   }
 
@@ -843,9 +893,21 @@
       });
     }
 
+    /* The rule, immediately under the "Castle remaining" figure it applies to —
+       that adjacency is the whole point, since those two numbers were previously
+       shown near each other with nothing to say they were connected. */
     if (won) {
-      UI.icon(ctx, 'icon03', d.x + d.w / 2 - 62, d.y + 470, 0.6);
-      TS.text(ctx, '+' + battle.reward, d.x + d.w / 2 + 26, d.y + 470, {
+      TS.text(ctx, starRuleText(), d.x + d.w / 2, d.y + 442, {
+        size: 17, fill: '#8d775c', stroke: null
+      });
+    }
+
+    if (won) {
+      /* Pushed down from 470 to make room for the sword rule above: the coin is
+         38px tall around its centre, so at 470 its top edge reached back up into
+         the legend's last line. */
+      UI.icon(ctx, 'icon03', d.x + d.w / 2 - 62, d.y + 490, 0.6);
+      TS.text(ctx, '+' + battle.reward, d.x + d.w / 2 + 26, d.y + 490, {
         size: 32, fill: '#ffd257', stroke: '#5a3a12'
       });
     } else {

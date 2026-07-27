@@ -112,6 +112,29 @@ Note the sprite anchor sits at the **feet**, which is why a vertical stretch gro
 upward instead of sinking the unit into the sand. And `ctx.imageSmoothingEnabled` is
 false, so a fractional scale stays nearest-neighbour rather than blurring the art.
 
+**A theme may dress the field but never change the lane.** `themes.js` varies ground
+palette, weather, water and wildlife per battle. It must not touch `TS.LAY` or the
+sand: the two-rank model is tuned around that geometry and units need walkable ground
+in all three depth rows. So water is always a band in the **upper field**, and the
+sand always comes from `Tilemap_Flat` whatever the theme — the alternate tilesets
+carry no sand at all. Weather and the day-tint draw in front of the units but inside
+the world transform, which is what keeps them off the HUD.
+
+**Scenery must never draw from `Math.random`.** `Scene.update` runs inside
+`simulate()`, so scenery sharing the global PRNG means weather perturbs combat: unit
+`atkTimer` jitter and the `guard` chance would land differently on a rainy level than
+a clear one, and differently again if you changed the raindrop count. Scenery uses its
+own seeded `srnd`. Decoupling this shifted the sim's stream once — one already-won
+battle moved from 100% to 92% tower HP — but no win/loss changed.
+
+**Two more measured traps, in the water art.** `Foam.png` is 8 frames of 192px but
+the ring is only ~82px of ink (x55-136) inset in the middle of the cell, so spacing
+foam by frame width leaves gaps in a shoreline; it is stepped by 66 instead, and
+`TS.FOAM_REACH` (42) is how far it spills past a shore — decor must be excluded from
+that margin too, or a sheep appears to stand in the froth. And the `Tilemap_colorN`
+interior cell is **(col 1, row 1)**: its left/middle/right pixel columns agree, unlike
+`Tilemap_Flat`'s c2r1 whose right edge is `#161c2e` and seams every 64px.
+
 **`file://` must keep working.** Hence classic `<script>` tags and a single global
 `TS` namespace — no ES modules. Keep it that way.
 

@@ -147,6 +147,26 @@
     /* No shadow sprite is loaded: BOTH the pack's shadow files are grey rounded
        squares, so unit shadows are drawn as flattened ellipses instead. */
 
+    /* Alternate ground palettes, one per level theme. These are the OLDER tileset
+       layout (576x384, a 4x4 autotile plus elevation and cliff strips) and carry
+       no sand at all, so they are used only for the grass field — the sand lane
+       always comes from Tilemap_Flat. Interior cell measured as (col 1, row 1);
+       see themes.js for the colours and why that cell is the safe one. */
+    for (var t = 1; t <= 5; t++) {
+      m['tint' + t] = TER + 'Tileset/Tilemap_color' + t + '.png';
+    }
+
+    /* Water features for the themes that have a lake. Water.png is a flat 64px
+       tile (the surface does not animate); the movement all comes from the foam
+       ring and the water-rock sheets, which do. */
+    m['water'] = TER + 'Water/Water.png';
+    m['foam'] = TER + 'Water/Foam/Foam.png';
+    m['duck'] = TER + 'Decorations/Rubber Duck/Rubber duck.png';
+    for (var wr = 1; wr <= 4; wr++) {
+      m['waterRock' + wr] =
+        TER + 'Decorations/Rocks in the Water/Water Rocks_0' + wr + '.png';
+    }
+
     /* Decor. */
     for (var i = 1; i <= 4; i++) {
       m['bush' + i] = TER + 'Decorations/Bushes/Bushe' + i + '.png';
@@ -352,6 +372,23 @@
     }
     SPR.decor.sheepIdle = s(images['sheepIdle'], 128, 128, 6, 64, 108);
     SPR.decor.sheepGrass = s(images['sheepGrass'], 128, 128, 12, 64, 108);
+
+    /* Water features. MEASURED, because none of these follow from image width:
+         Foam.png            1536x192 = 8 frames of 192, but the ring itself only
+                             occupies x55-136 y55-136 — about 82px inset in the
+                             middle of the frame. Spacing foam by the 192px frame
+                             width leaves visible gaps in a shoreline; space it by
+                             the ~82px of actual ink instead.
+         Rubber duck.png     96x32  = 3 frames of 32, ink y5-27 (it bobs).
+         Water Rocks_0N.png  1024x64 = 16 frames of 64, ink x9-49 y25-53, so the
+                             anchor sits low in the cell where the water laps. */
+    SPR.decor.foam = s(images['foam'], 192, 192, 8, 96, 96);
+    SPR.decor.duck = s(images['duck'], 32, 32, 3, 16, 26);
+    SPR.decor.waterRock = [];
+    for (var wr = 1; wr <= 4; wr++) {
+      var wri = images['waterRock' + wr];
+      if (wri) SPR.decor.waterRock.push(s(wri, 64, 64, 16, 32, 50));
+    }
 
     /* Scatter props, base-anchored so they sit on the ground. */
     SPR.decor.props = [];
