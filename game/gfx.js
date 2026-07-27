@@ -199,11 +199,23 @@ window.TS = window.TS || {};
 
   /* Horizontal 3-slice metrics. `rowH` is the row pitch for the multi-colour
      Ribbons and Swords sheets; sy/sh are the art band inside one row. */
+  /* `labelCy` is where the COLOURED BAND's centre falls in destination pixels —
+     not the middle of the drawn height. Each ribbon carries a dark rim and a
+     drop shadow along its lower edge, so the band a label should sit on is
+     noticeably higher than the geometric centre (8px on the big ribbon).
+     `capW` is the width of the forked end cap: icons must stay left of it or they
+     hang off the tail. */
   TS.THREE = {
     barBig: { x: [40, 128, 256], w: [24, 64, 24], sy: 9, sh: 51, rowH: 0 },
     barSmall: { x: [49, 128, 256], w: [15, 64, 15], sy: 22, sh: 19, rowH: 0 },
-    ribbonS: { x: [3, 128, 256], w: [61, 64, 61], sy: 4, sh: 54, rowH: 64 },
-    ribbonB: { x: [30, 192, 320], w: [98, 64, 97], sy: 20, sh: 103, rowH: 128 },
+    ribbonS: {
+      x: [3, 128, 256], w: [61, 64, 61], sy: 4, sh: 54, rowH: 64,
+      labelCy: 26, capW: 61
+    },
+    ribbonB: {
+      x: [30, 192, 320], w: [98, 64, 97], sy: 20, sh: 103, rowH: 128,
+      labelCy: 44, capW: 97
+    },
     swords: { x: [23, 192, 320], w: [105, 64, 92], sy: 0, sh: 128, rowH: 128 }
   };
 

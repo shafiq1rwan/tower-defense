@@ -11,11 +11,18 @@
   var UI = {};
   TS.UI = UI;
 
-  /* Buttons in the pack's 128px frames carry ~20px of transparent padding, so
-     the visible face is about 88x94. Rects below are the VISIBLE face; the art
-     is drawn offset. */
+  /* Buttons in the pack's 128px frames carry ~20px of transparent padding, so the
+     visible art is about 88x94. Rects below are that art box; the sheet is drawn
+     offset by the padding.
+     FACE_CY is where a glyph belongs: the raised face is bracketed by light rim
+     rows at art y19-21 and y97-100, centring it on art y59 — but the art box runs
+     to y110 because of the 3D base lip below, so its own centre (y64) sits 5px too
+     low and made every label look off. Both the square and round buttons share
+     this construction. */
   var BTN_PAD_X = 20, BTN_PAD_Y = 17;
   UI.ICON_BTN = { w: 88, h: 94 };
+  var FACE_CY = 59 - BTN_PAD_Y;      // 42px below the rect's top
+  var FACE_CY_PRESSED = FACE_CY + 7; // pressed art is squashed and sits lower
 
   /* Ribbon rows: 5 colours x 2 tail styles (forked, rounded). */
   UI.RIB = { tealR: 1, redR: 3, yellowR: 5, purpleR: 7, greyR: 9 };
@@ -64,6 +71,17 @@
     return TS.threeSlice(ctx, TS.img('swords'), TS.THREE.swords, x, y, w, row);
   };
 
+  /* Vertical centre of a ribbon's coloured band, in destination pixels from its
+     top. Use this rather than half the drawn height — the dark rim and drop
+     shadow along the lower edge push the band well above the geometric middle. */
+  UI.ribbonMid = function (kind) {
+    return (kind === 'big' ? TS.THREE.ribbonB : TS.THREE.ribbonS).labelCy;
+  };
+  /* Width of the forked end cap; keep icons left of it. */
+  UI.ribbonCap = function (kind) {
+    return (kind === 'big' ? TS.THREE.ribbonB : TS.THREE.ribbonS).capW;
+  };
+
   /* Ribbon with a centred label — the common case, and it keeps the vertical
      centring in one place. */
   UI.labelRibbon = function (ctx, kind, x, y, w, row, label, o) {
@@ -71,7 +89,7 @@
       : UI.smallRibbon(ctx, x, y, w, row);
     if (label != null) {
       o = o || {};
-      TS.text(ctx, label, o.tx == null ? x + w / 2 : o.tx, y + h / 2 + 1, {
+      TS.text(ctx, label, o.tx == null ? x + w / 2 : o.tx, y + UI.ribbonMid(kind), {
         size: o.size || 26, fill: o.fill || '#fff8e6', stroke: o.stroke || '#2a2a2e',
         align: o.align
       });
@@ -126,17 +144,18 @@
   Button.prototype.draw = function (ctx) {
     var k = this.kind;
     var down = this.pressed;
-    /* Only the stretched 9-slice buttons need a manual press offset. The pack's
-       Pressed art for the small buttons is already squashed and shifted down
-       (face moves from y17-110 to y28-112), so nudging it again double-counts. */
-    var dy = 0;
+    var cx = this.x + this.w / 2;
+    var cy;
 
     if (k === 'big' || k === 'bigRed') {
-      dy = down ? 3 : 0;
+      var dy = down ? 3 : 0;
       var img = TS.img(k === 'big'
         ? (down ? 'btnBluePressed' : 'btnBlue')
         : (down ? 'btnRedPressed' : 'btnRed'));
       TS.nineSlice(ctx, img, TS.SLICE.button, this.x, this.y + dy, this.w, this.h);
+      /* Stretched buttons: the 9-slice fills the rect exactly, so its own centre
+         is right. Nudged up 2px because the bottom lip is the thicker slice. */
+      cy = this.y + this.h / 2 - 2 + dy;
     } else {
       var map = {
         sqBlue: ['sqBlue', 'sqBluePressed'],
@@ -145,14 +164,11 @@
       }[k] || ['sqBlue', 'sqBluePressed'];
       var im = TS.img(down ? map[1] : map[0]);
       if (im) ctx.drawImage(im, Math.round(this.x - BTN_PAD_X), Math.round(this.y - BTN_PAD_Y));
-      if (down) dy = 6;   // centre of the pressed face sits 6px lower
+      cy = this.y + (down ? FACE_CY_PRESSED : FACE_CY);
     }
-
-    var cx = this.x + this.w / 2;
-    var cy = this.y + this.h / 2 + dy;
     if (this.icon) UI.icon(ctx, this.icon, cx, cy, this.iconScale);
     if (this.label != null) {
-      TS.text(ctx, this.label, cx, cy + 1, {
+      TS.text(ctx, this.label, cx, cy, {
         size: this.labelSize, fill: '#fff8e6', stroke: '#2f4b52'
       });
     }
@@ -213,7 +229,9 @@
     /* Keep the bar on screen even though the castle is cropped by the edge. */
     var cx = TS.clamp(castle.x, 24 + w / 2, TS.W - 24 - w / 2);
     var x = Math.round(cx - w / 2);
-    var y = 660;
+    /* Clear of the taller of the two buildings: the tower reaches 182px above its
+       foot line, which now sits on the middle depth row at y835. */
+    var y = 622;
     var frac = castle.barHp / castle.maxHp;
     var c = castle.isPlayer ? ALLY : FOE;
     TS.text(ctx, Math.ceil(castle.hp), cx, y - 24, {
@@ -412,14 +430,15 @@
     }
 
     /* --- top row ------------------------------------------------------- */
-    /* Ribbon art is 54px tall, so its centre is y+27. */
+    /* Content sits on the ribbon's coloured band, not its geometric middle. */
+    var ribMid = 40 + UI.ribbonMid('small');
     UI.smallRibbon(ctx, 18, 40, 196, UI.RIB.tealR);
-    UI.icon(ctx, 'icon03', 54, 67, 0.72);
-    TS.text(ctx, save.gold, 140, 68, { size: 27, fill: '#fff8e6', stroke: '#264448' });
+    UI.icon(ctx, 'icon03', 54, ribMid, 0.72);
+    TS.text(ctx, save.gold, 140, ribMid, { size: 27, fill: '#fff8e6', stroke: '#264448' });
 
     UI.smallRibbon(ctx, 226, 40, 168, UI.RIB.yellowR);
-    UI.icon(ctx, 'icon05', 262, 67, 0.72);
-    TS.text(ctx, save.wins, 338, 68, { size: 27, fill: '#fff8e6', stroke: '#5a4410' });
+    UI.icon(ctx, 'icon05', 262, ribMid, 0.72);
+    TS.text(ctx, save.wins, 338, ribMid, { size: 27, fill: '#fff8e6', stroke: '#5a4410' });
 
     TS.text(ctx, 'Battle ' + (battle.level.index + 1), 676, 68, {
       size: 34, fill: '#fff8e6', stroke: '#3a2418', align: 'right'

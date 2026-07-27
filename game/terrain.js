@@ -43,7 +43,9 @@
     /* Bases sit on the sand. Both buildings are ~113px of visible art inside a
        128px frame, so each sits fully on screen rather than cropped, and the lane
        between them is wide. */
-    castleBaseY: 925,
+    /* Bases stand on the MIDDLE depth row, so they sit centred in the sand band
+       with units filing past both in front of and behind them. */
+    castleBaseY: 835,
     playerCastleX: 66,    // tower art spans 9..122
     enemyCastleX: 768,    // hut art spans 711..823
 
@@ -139,46 +141,55 @@
     Terrain.canvas = cv;
   };
 
-  /* Anything that never animates belongs in the baked layer. */
+  /* Anything that never animates belongs in the baked layer. Everything is
+     collected first and drawn in base-Y order, so a nearer pebble is never
+     painted underneath a further one. */
   function bakeStaticDecor(g, rnd) {
     var D = TS.SPR.decor;
     var props = D.props || [];
+    var queue = [];
     var i;
 
-    var rockSpots = [[96, 470], [268, 392], [612, 452], [742, 386], [430, 336]];
-    for (i = 0; i < rockSpots.length; i++) {
-      TS.drawFrame(g, D.rock[(rnd() * 4) | 0], 0, rockSpots[i][0], rockSpots[i][1],
-        { flip: rnd() < 0.5 });
+    function add(spr, x, y, alpha) {
+      if (spr) queue.push({ spr: spr, x: x, y: y, flip: rnd() < 0.5, alpha: alpha });
     }
-    TS.drawFrame(g, D.stump[(rnd() * 4) | 0], 0, 706, 560, {});
-    TS.drawFrame(g, D.stump[(rnd() * 4) | 0], 0, 120, 606, { flip: true });
 
-    var lowerRocks = [[70, 1160], [206, 1122], [636, 1150], [770, 1118], [396, 1170]];
-    for (i = 0; i < lowerRocks.length; i++) {
-      TS.drawFrame(g, D.rock[(rnd() * 4) | 0], 0, lowerRocks[i][0], lowerRocks[i][1],
-        { flip: rnd() < 0.5 });
+    var rockSpots = [
+      [96, 470], [268, 392], [612, 452], [742, 386], [430, 336],
+      [70, 1160], [206, 1122], [636, 1150], [770, 1118], [396, 1170]
+    ];
+    for (i = 0; i < rockSpots.length; i++) {
+      add(D.rock[(rnd() * 4) | 0], rockSpots[i][0], rockSpots[i][1]);
     }
+    add(D.stump[(rnd() * 4) | 0], 706, 560);
+    add(D.stump[(rnd() * 4) | 0], 120, 606);
 
     /* Scatter props (mushrooms, tufts, pebbles, a bone) across the grass, and a
        sparse few on the sand — the reference dresses its lane lightly too. */
-    if (!props.length) return;
-    var grassSpots = [
-      [160, 330], [340, 380], [500, 300], [660, 340], [58, 420], [770, 480],
-      [230, 520], [430, 560], [560, 600], [110, 540], [690, 600], [300, 630],
-      [140, 1080], [340, 1105], [520, 1085], [700, 1075], [250, 1180],
-      [600, 1195], [80, 1230], [450, 1250], [760, 1215]
-    ];
-    for (i = 0; i < grassSpots.length; i++) {
-      TS.drawFrame(g, props[(rnd() * props.length) | 0], 0,
-        grassSpots[i][0], grassSpots[i][1], { flip: rnd() < 0.5 });
+    if (props.length) {
+      var grassSpots = [
+        [160, 330], [340, 380], [500, 300], [660, 340], [58, 420], [770, 480],
+        [230, 520], [430, 560], [560, 600], [110, 540], [690, 600], [300, 630],
+        [140, 1080], [340, 1105], [520, 1085], [700, 1075], [250, 1180],
+        [600, 1195], [80, 1230], [450, 1250], [760, 1215]
+      ];
+      for (i = 0; i < grassSpots.length; i++) {
+        add(props[(rnd() * props.length) | 0], grassSpots[i][0], grassSpots[i][1]);
+      }
+      /* On-sand props are kept to pebbles and the bone so nothing looks like it
+         is growing out of the battle lane. */
+      var sandProps = [props[3], props[4], props[5], props[13]].filter(Boolean);
+      var sandSpots = [[300, 726], [520, 736], [420, 946], [640, 940], [210, 942]];
+      for (i = 0; i < sandSpots.length; i++) {
+        add(sandProps[(rnd() * sandProps.length) | 0],
+          sandSpots[i][0], sandSpots[i][1], 0.9);
+      }
     }
-    /* On-sand props are kept to pebbles and the bone so nothing looks like it is
-       growing out of the battle lane. */
-    var sandProps = [props[3], props[4], props[5], props[13]].filter(Boolean);
-    var sandSpots = [[300, 726], [520, 736], [420, 946], [640, 940], [210, 942]];
-    for (i = 0; i < sandSpots.length; i++) {
-      TS.drawFrame(g, sandProps[(rnd() * sandProps.length) | 0], 0,
-        sandSpots[i][0], sandSpots[i][1], { flip: rnd() < 0.5, alpha: 0.9 });
+
+    queue.sort(function (a, b) { return a.y - b.y; });
+    for (i = 0; i < queue.length; i++) {
+      var q = queue[i];
+      TS.drawFrame(g, q.spr, 0, q.x, q.y, { flip: q.flip, alpha: q.alpha });
     }
   }
 

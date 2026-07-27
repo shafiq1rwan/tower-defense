@@ -4,15 +4,15 @@
  * Every item carries its own animation phase and frame rate; without that the
  * trees and bushes sway in visible lockstep, which instantly reads as cheap.
  *
- * Bases above LAY.plateauTop can never overlap the plateau (sprites extend
- * upward from their anchor), and bases below LAY.cliffBot sit in front of the
- * cliff face — so all scenery can safely draw straight after the baked
- * background without any depth sorting against the units.
+ * Scenery draws in one list sorted by base Y, so nearer items occlude further
+ * ones. It all draws behind the units: every scenery base sits either above the
+ * sand lane or below it, and sprites extend upward from their anchor, so nothing
+ * here can reach a unit standing on the lane.
  */
 (function (TS) {
   'use strict';
 
-  var Scene = { clouds: [], trees: [], bushes: [], sheep: [] };
+  var Scene = { clouds: [], trees: [], bushes: [], sheep: [], layer: [] };
   TS.Scene = Scene;
 
   Scene.build = function (seed) {
@@ -86,6 +86,7 @@
     var sheepSpots = [[236, 462], [560, 500]];
     for (i = 0; i < sheepSpots.length; i++) {
       Scene.sheep.push({
+        kind: 'sheep',
         x: sheepSpots[i][0],
         y: sheepSpots[i][1],
         homeX: sheepSpots[i][0],
@@ -95,6 +96,8 @@
         phase: rnd() * 12
       });
     }
+
+    buildLayer();
   };
 
   Scene.update = function (dt) {
@@ -137,7 +140,20 @@
     }
   };
 
-  /* Everything behind the units: clouds, then scenery. */
+  /* One depth-sorted draw list, holding references to the arrays above so their
+     animation updates still apply. Ground scenery has to be ordered by base Y
+     exactly like the units are: drawing every tree and then every bush put all
+     bushes in front of all trees regardless of which stood nearer, so a bush
+     behind a tree floated on top of its canopy.
+     Positions are fixed after build (sheep drift on X only), so sorting once
+     here is both correct and free. */
+  function buildLayer() {
+    Scene.layer = Scene.sheep
+      .concat(Scene.trees, Scene.bushes)
+      .sort(function (a, b) { return a.y - b.y; });
+  }
+
+  /* Everything behind the units: clouds, then depth-sorted scenery. */
   Scene.drawBack = function (ctx) {
     var i, o;
 
@@ -146,20 +162,12 @@
       TS.drawFrame(ctx, o.spr, 0, o.x, o.y, { alpha: o.alpha, scale: o.scale });
     }
 
-    for (i = 0; i < Scene.sheep.length; i++) {
-      o = Scene.sheep[i];
-      var spr = o.state === 'graze' ? TS.SPR.decor.sheepGrass : TS.SPR.decor.sheepIdle;
+    for (i = 0; i < Scene.layer.length; i++) {
+      o = Scene.layer[i];
+      var spr = o.kind === 'sheep'
+        ? (o.state === 'graze' ? TS.SPR.decor.sheepGrass : TS.SPR.decor.sheepIdle)
+        : o.spr;
       TS.drawFrame(ctx, spr, o.phase | 0, o.x, o.y, { flip: o.flip });
-    }
-
-    for (i = 0; i < Scene.trees.length; i++) {
-      o = Scene.trees[i];
-      TS.drawFrame(ctx, o.spr, o.phase | 0, o.x, o.y, { flip: o.flip });
-    }
-
-    for (i = 0; i < Scene.bushes.length; i++) {
-      o = Scene.bushes[i];
-      TS.drawFrame(ctx, o.spr, o.phase | 0, o.x, o.y, { flip: o.flip });
     }
   };
 

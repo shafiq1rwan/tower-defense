@@ -192,11 +192,27 @@ rediscovered. Several of these are traps that render *almost* correctly.
   button. `UI.icon` applies measured per-icon nudges.
 - `Arrow.png` is one static frame, rotated to its velocity.
 
-### Text
+### Centring things on this kit
+
+Three separate reasons a label can look off-centre here, all of which had to be
+fixed independently:
 
 - **Canvas `textBaseline: 'middle'` is not optically centred.** It aligns the
-  font's em box, which sits off-centre for all-caps and for digits, and left every
-  button label looking slightly high or low. `TS.text` measures the glyphs' real
-  ink box via `actualBoundingBoxAscent`/`Descent` and centres on that instead.
+  font's em box, which sits off-centre for all-caps and for digits. `TS.text`
+  measures the glyphs' real ink box via `actualBoundingBoxAscent`/`Descent` and
+  centres on that instead.
+- **A button's art box is not its face.** The small buttons' raised face is
+  bracketed by light rim rows at art y19–21 and y97–100, centring it on **y59** —
+  but the art box runs to y110 because of the 3D base lip below it, so the box's
+  own centre (y64) is 5px too low. Square and round buttons share this
+  construction; `UI` centres glyphs on the face, not the box.
+- **A ribbon's coloured band is not its drawn height.** Each ribbon has a dark rim
+  and a drop shadow along its lower edge, so the band a label belongs on sits
+  above the geometric middle — by 8px on the big ribbon. `TS.THREE.*.labelCy`
+  holds the measured band centre.
+
+And horizontally: **the ribbon end caps are forked tails that narrow**, so icons
+placed by offsetting from the ribbon's right edge hang off the fork rather than
+sitting on the band. `TS.THREE.*.capW` gives the cap width to stay clear of.
 
 The art is the Tiny Swords pack by Pixel Frog; only the code here is new.

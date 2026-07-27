@@ -146,7 +146,7 @@
     },
     {
       name: 'The Goblin Camp',
-      objective: 'Burn the watchtower',
+      objective: 'Burn down the goblin hut',
       cards: [P, W, A, M, L],
       playerHp: 520, enemyHp: 720,
       startGold: 280, goldRate: 24, goldCap: 700,

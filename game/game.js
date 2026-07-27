@@ -565,15 +565,19 @@
       var top = b.y + pressed;
       /* Big ribbon art is 103px tall, matching the button rect exactly. */
       UI.bigRibbon(ctx, b.x, top, b.w, unlocked ? UI.PLATE.teal : UI.PLATE.black);
-      var mid = top + 51;
+      /* Centre of the coloured band, which sits above the geometric middle. */
+      var mid = top + UI.ribbonMid('big');
+      /* Right limit for content: the end cap is a forked tail that narrows, so
+         anything past here hangs off the ribbon rather than sitting on it. */
+      var inner = b.x + b.w - UI.ribbonCap('big') - 16;
 
       ctx.save();
       if (!unlocked) ctx.globalAlpha = 0.72;
-      TS.text(ctx, (i + 1) + '.  ' + lv.name, b.x + 118, mid - 12, {
+      TS.text(ctx, (i + 1) + '.  ' + lv.name, b.x + 118, mid - 13, {
         size: 28, fill: unlocked ? '#fff8e6' : '#c9c9c9',
         stroke: unlocked ? '#264448' : '#2a2a2e', align: 'left'
       });
-      TS.text(ctx, lv.objective, b.x + 120, mid + 20, {
+      TS.text(ctx, lv.objective, b.x + 120, mid + 17, {
         size: 18, fill: unlocked ? '#cfe6dd' : '#a8a8a8',
         stroke: unlocked ? '#223c42' : '#2a2a2e', align: 'left'
       });
@@ -584,11 +588,11 @@
         for (var s = 0; s < 3; s++) {
           ctx.save();
           ctx.globalAlpha = s < stars ? 1 : 0.26;
-          UI.icon(ctx, 'icon05', b.x + b.w - 148 + s * 38, mid, 0.5);
+          UI.icon(ctx, 'icon05', inner - 76 + s * 38, mid, 0.5);
           ctx.restore();
         }
       } else {
-        UI.icon(ctx, 'icon06', b.x + b.w - 78, mid, 0.62);
+        UI.icon(ctx, 'icon06', inner - 20, mid, 0.62);
       }
     }
   }
