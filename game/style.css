@@ -1,0 +1,69 @@
+/* Tiny Swords: Lane Siege — shell styling.
+   The canvas is one fixed logical resolution scaled to fit; all pixel-art
+   crispness depends on this being a single uniform upscale. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1d2b26;
+  /* Radial vignette so letterbox bars read as intentional framing. */
+  background-image: radial-gradient(ellipse at 50% 35%, #35544a 0%, #1d2b26 70%);
+  font-family: "Trebuchet MS", Verdana, sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Installed as a PWA the page runs edge to edge, so inset the playfield out
+     from under notches and home indicators. game.js measures this element's
+     content box, so the canvas fit follows these values automatically. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#game {
+  display: block;
+  /* Sized in JS. Nearest-neighbour on every engine we care about. */
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+  box-shadow: 0 0 0 4px #23332c, 0 18px 60px rgba(0, 0, 0, 0.55);
+  cursor: none;
+}
+
+/* Touch devices get the OS cursor back (there is no pointer to replace). */
+body.touch #game { cursor: auto; }
+
+#rotate-hint {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  color: #f4e4c1;
+  font-size: clamp(18px, 5vw, 30px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #1d2b26;
+  z-index: 10;
+}
+
+/* Only nag on genuinely short-and-wide touch screens, never on desktop. */
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  #rotate-hint { display: flex; }
+  #stage { display: none; }
+}

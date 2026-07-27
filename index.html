@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3f7d4e">
+<meta name="description" content="A portrait lane-battler: summon units, hold the line, and take the enemy keep.">
+<title>Tiny Swords: Lane Siege</title>
+
+<!-- Installable PWA. Every href here is relative so the app works unchanged
+     from a domain root or a GitHub Pages project subpath. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lane Siege">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="stylesheet" href="game/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+</div>
+<div id="rotate-hint">Rotate your device to portrait</div>
+
+<script src="game/gfx.js"></script>
+<script src="game/assets.js"></script>
+<script src="game/audio.js"></script>
+<script src="game/save.js"></script>
+<script src="game/terrain.js"></script>
+<script src="game/scene.js"></script>
+<script src="game/fx.js"></script>
+<script src="game/entities.js"></script>
+<script src="game/levels.js"></script>
+<script src="game/ui.js"></script>
+<script src="game/game.js"></script>
+
+<script>
+/* Register the service worker for offline play. A relative URL keeps the scope
+   correct under a project subpath. Registration throws on file:// — the catch is
+   what keeps the game playable by opening index.html directly. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function (err) {
+      console.info('[pwa] service worker not registered:', err && err.message);
+    });
+  });
+}
+</script>
+</body>
+</html>

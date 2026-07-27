@@ -1,0 +1,9 @@
+# macOS Finder metadata that ships inside the asset folders
+.DS_Store
+**/.DS_Store
+
+# Aseprite sources are the art originals, not needed to run or host the game.
+# Delete this line if you want them versioned alongside the PNGs.
+*.aseprite
+
+node_modules/
