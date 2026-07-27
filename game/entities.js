@@ -53,13 +53,13 @@
        other unit. Give it competitive damage and spamming it dominates, because
        only about two ranks can reach and cheap bodies refresh the front fastest. */
     Pawn: {
-      name: 'Pawn', cost: 30, hp: 70, dmg: 6, contact: 66, range: 118, speed: 62,
+      name: 'Pawn', body: 62, cost: 30, hp: 70, dmg: 6, contact: 66, range: 118, speed: 62,
       cooldown: 0.9, height: 86,
       fps: { idle: 8, run: 12, attack: 11 }, hitFrame: 2,
       blurb: 'Cheap and quick. Buys you time, not damage.'
     },
     Warrior: {
-      name: 'Warrior', cost: 60, hp: 185, dmg: 21, contact: 78, range: 130,
+      name: 'Warrior', body: 79, cost: 60, hp: 185, dmg: 21, contact: 78, range: 130,
       speed: 46, cooldown: 1.0, height: 92, guard: true, twoSwings: true,
       fps: { idle: 8, run: 11, attack: 12, attack2: 12, guard: 12 }, hitFrame: 2,
       blurb: 'The backbone. Best value on the front line.'
@@ -67,13 +67,13 @@
     /* Fragile, but its contact distance keeps it far behind the melee, so it
        rarely has to survive anything. */
     Archer: {
-      name: 'Archer', cost: 90, hp: 78, dmg: 21, contact: 205, range: 260,
+      name: 'Archer', body: 70, cost: 90, hp: 78, dmg: 21, contact: 205, range: 260,
       speed: 44, cooldown: 1.3, height: 90, ranged: true,
       fps: { idle: 8, run: 10, attack: 13 }, hitFrame: 5,
       blurb: 'Kills from safety. Useless if the line breaks.'
     },
     Monk: {
-      name: 'Monk', cost: 120, hp: 110, dmg: 0, heal: 32, contact: 999,
+      name: 'Monk', body: 58, cost: 120, hp: 110, dmg: 0, heal: 32, contact: 999,
       range: 175, speed: 42, cooldown: 2.2, height: 90,
       healer: true, keepDistance: 215,
       fps: { idle: 8, run: 10, attack: 12 }, hitFrame: 6,
@@ -81,7 +81,7 @@
     },
     /* Holds a full lance-length back — the whole point of the class. */
     Lancer: {
-      name: 'Lancer', cost: 200, hp: 350, dmg: 42, contact: 104, range: 160,
+      name: 'Lancer', body: 69, cost: 200, hp: 350, dmg: 42, contact: 104, range: 160,
       speed: 34, cooldown: 1.5, height: 96, guard: true,
       fps: { idle: 9, run: 10, attack: 9, guard: 11 }, hitFrame: 1,
       blurb: 'Slow, brutal, and strikes from behind the line.'
@@ -91,7 +91,7 @@
 
     /* The horde staple. Measured body 74px wide, hence contact 76. */
     Torch: {
-      name: 'Torch Goblin', enemy: true,
+      name: 'Torch Goblin', body: 74, enemy: true,
       hp: 105, dmg: 13, contact: 76, range: 124, speed: 54,
       cooldown: 0.95, height: 88,
       /* Damage lands as the flame arc sweeps across, on frame 3 of 6. */
@@ -100,7 +100,7 @@
     /* Lobs dynamite that detonates in an area, so a tightly packed player line
        takes the hit together. */
     TNT: {
-      name: 'TNT Goblin', enemy: true,
+      name: 'TNT Goblin', body: 86, enemy: true,
       hp: 85, dmg: 11, contact: 200, range: 250, speed: 44,
       cooldown: 2.1, height: 88, ranged: true, aoe: 58,
       fps: { idle: 8, run: 11, attack: 12 }, hitFrame: 5
@@ -108,7 +108,7 @@
     /* A rolling keg: quick, fragile, and detonates on contact instead of
        attacking. Kill it at range or it takes the front rank with it. */
     Barrel: {
-      name: 'Barrel Bomb', enemy: true,
+      name: 'Barrel Bomb', body: 57, enemy: true,
       hp: 65, dmg: 32, contact: 48, range: 48, speed: 96,
       cooldown: 99, height: 64, suicide: true, aoe: 70,
       fps: { idle: 6, run: 13, attack: 14 }, hitFrame: 1
@@ -129,18 +129,21 @@
 
   /* Per-faction base art. `ay` is the foot line inside the frame and artL/artR
      are how far the visible art reaches either side of the anchor — measured,
-     because neither building fills its frame. The frame width would be wrong for
-     the gate test: the goblin tower's art is only 129px inside a 256px frame. */
+     because neither building fills its frame, and the frame width would be the
+     wrong thing for the gate test (both buildings are ~113px of art inside a
+     128px frame, and the base each replaced was wider still). */
   var BASE_META = {
+    /* Tower_Blue: 128x256, art x7-120, base y234. Wreck base y229. */
     player: {
       img: 'basePlayer', wreck: 'basePlayerWreck',
-      ax: 160, ay: 250, wreckAy: 253, artL: 156, artR: 155, frames: 1, fps: 1,
-      firePlume: 95, shadowR: 140
+      ax: 64, ay: 234, wreckAy: 229, artL: 57, artR: 56, frames: 1, fps: 1,
+      firePlume: 42, shadowR: 58
     },
+    /* Goblin_House: 128x192, art x7-119, base y170. Wreck base y173. */
     enemy: {
       img: 'baseEnemy', wreck: 'baseEnemyWreck',
-      ax: 128, ay: 170, wreckAy: 173, artL: 65, artR: 64, frames: 4, fps: 6,
-      firePlume: 50, shadowR: 74
+      ax: 64, ay: 170, wreckAy: 173, artL: 57, artR: 55, frames: 1, fps: 1,
+      firePlume: 42, shadowR: 56
     }
   };
 
@@ -614,9 +617,16 @@
     }
   };
 
+  /* Drawn rather than blitted. BOTH shadow sprites the pack ships
+     (Terrain/Tileset/Shadow.png and Terrain/Ground/Shadows.png) are grey rounded
+     SQUARES about as tall as they are wide, so used as a drop shadow they put a
+     grey block behind every unit's legs. A flattened ellipse sized from the
+     measured body width reads correctly and scales to each class — the Barrel is
+     57px across where the TNT goblin is 86. */
   Unit.prototype.drawShadow = function (ctx) {
     if (this.dead) return;
-    TS.drawFrame(ctx, TS.SPR.shadow, 0, this.x + this.push, this.feetY, { alpha: 0.5 });
+    var rx = this.def.body * 0.40;
+    TS.blobShadow(ctx, this.x + this.push, this.feetY - 3, rx, rx * 0.32, 0.27);
   };
 
   Unit.prototype.draw = function (ctx) {

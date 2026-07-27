@@ -256,16 +256,32 @@ window.TS = window.TS || {};
   var FONT = '"Trebuchet MS", "Segoe UI", Verdana, sans-serif';
 
   /* Chunky outlined text. The pack ships no font, and a heavy dark stroke is
-     what makes a vector-ish font sit convincingly on top of pixel art. */
+     what makes a vector-ish font sit convincingly on top of pixel art.
+     Vertical centring measures the glyphs' real ink box rather than trusting
+     textBaseline:'middle', which aligns the font's em box — that sits off-centre
+     for all-caps and for digits, and left every button label looking slightly
+     high or low. */
   TS.text = function (ctx, str, x, y, o) {
     o = o || {};
     var size = Math.round(o.size || 24);
     ctx.font = (o.weight || 700) + ' ' + size + 'px ' + FONT;
     ctx.textAlign = o.align || 'center';
-    ctx.textBaseline = o.baseline || 'middle';
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
     str = String(str);
+
+    if (o.baseline) {
+      ctx.textBaseline = o.baseline;
+    } else {
+      ctx.textBaseline = 'alphabetic';
+      var m = ctx.measureText(str);
+      if (m.actualBoundingBoxAscent != null) {
+        y += (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+      } else {
+        y += size * 0.35;   // fallback for engines without ink metrics
+      }
+      y = Math.round(y);
+    }
     if (o.shadow) {
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = '#000';

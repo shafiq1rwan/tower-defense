@@ -127,11 +127,13 @@
     });
     m['dynamite'] = 'Factions/Goblins/Troops/TNT/Dynamite/Dynamite.png';
 
-    /* Bases, each with the destroyed state the full pack provides. */
-    m['basePlayer'] = 'Factions/Knights/Buildings/Castle/Castle_Blue.png';
-    m['basePlayerWreck'] = 'Factions/Knights/Buildings/Castle/Castle_Destroyed.png';
-    m['baseEnemy'] = 'Factions/Goblins/Buildings/Wood_Tower/Wood_Tower_Red.png';
-    m['baseEnemyWreck'] = 'Factions/Goblins/Buildings/Wood_Tower/Wood_Tower_Destroyed.png';
+    /* Bases, each with the destroyed state the full pack provides. A stone tower
+       against a goblin hut: both about 113px of visible art, so the two ends of
+       the lane carry equal weight. */
+    m['basePlayer'] = 'Factions/Knights/Buildings/Tower/Tower_Blue.png';
+    m['basePlayerWreck'] = 'Factions/Knights/Buildings/Tower/Tower_Destroyed.png';
+    m['baseEnemy'] = 'Factions/Goblins/Buildings/Wood_House/Goblin_House.png';
+    m['baseEnemyWreck'] = 'Factions/Goblins/Buildings/Wood_House/Goblin_House_Destroyed.png';
 
     m['arrow'] = UNIT_DIR + 'Blue Units/Archer/Arrow.png';
     m['healFx'] = UNIT_DIR + 'Blue Units/Monk/Heal_Effect.png';
@@ -142,9 +144,8 @@
     /* Ground. Tilemap_Flat carries a grass AND a sand 4x4 autotile side by side —
        the sand is what makes the battle lane match the reference. */
     m['ground'] = TER + 'Ground/Tilemap_Flat.png';
-    /* Terrain/Ground/Shadows.png is a grey rounded SQUARE — a building blob, not
-       a unit drop shadow. The Tileset folder's soft ellipse is the right one. */
-    m['shadow'] = TER + 'Tileset/Shadow.png';
+    /* No shadow sprite is loaded: BOTH the pack's shadow files are grey rounded
+       squares, so unit shadows are drawn as flattened ellipses instead. */
 
     /* Decor. */
     for (var i = 1; i <= 4; i++) {
@@ -313,9 +314,6 @@
       });
       SPR.unit[cls] = out;
     });
-
-    /* Shadow.png's bottom edge lines up with the unit foot anchor exactly. */
-    SPR.shadow = s(images['shadow'], 192, 192, 1, 96, 135);
 
     /* Heal_Effect overlays the healed unit, so it shares the unit anchor. */
     SPR.healFx = s(images['healFx'], 192, 192, 11, 96, 135);

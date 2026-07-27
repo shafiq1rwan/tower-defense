@@ -27,6 +27,12 @@
   var hud = null;          // battle-screen widgets
   var titleUnits = [];
   var titleBases = [];
+  var confirmingReset = false;
+
+  /* Level rows use the 103px big ribbon, not the 54px small one: at the CSS scale
+     a phone renders this canvas at, 54 logical px is only ~25 device-independent
+     pixels — far under a comfortable touch target. */
+  var SELECT_TOP = 284, SELECT_PITCH = 114;
 
   var pointer = { x: -999, y: -999, down: false, target: null, hand: false, touch: false };
 
@@ -191,6 +197,7 @@
   function goTitle() {
     screen = 'title';
     paused = false;
+    confirmingReset = false;
     battle = null;
     buttons = [
       new TS.UI.Button({
@@ -203,12 +210,47 @@
       }),
       new TS.UI.Button({
         x: TS.W - 118, y: 1300, kind: 'sqRed', icon: 'icon09',
+        /* Wiping every battle you have cleared is not something a stray tap
+           should be able to do. */
+        onTap: askResetConfirm
+      })
+    ];
+  }
+
+  function askResetConfirm() {
+    confirmingReset = true;
+    buttons = [
+      new TS.UI.Button({
+        x: 130, y: 806, w: 260, h: 126, kind: 'bigRed', label: 'RESET', labelSize: 32,
         onTap: function () {
           TS.Save.reset();
           TS.Save.get();
+          goTitle();
         }
+      }),
+      new TS.UI.Button({
+        x: 442, y: 806, w: 260, h: 126, kind: 'big', label: 'CANCEL', labelSize: 30,
+        onTap: goTitle
       })
     ];
+  }
+
+  function drawResetConfirm() {
+    var save = TS.Save.get();
+    var d = TS.UI.dialog(ctx, {
+      w: 620, h: 480, y: 470, title: 'ARE YOU SURE?', titleRow: TS.UI.PLATE.red
+    });
+    TS.text(ctx, 'This erases all progress:', TS.W / 2, d.y + 116, {
+      size: 26, fill: '#5c4632', stroke: null
+    });
+    TS.text(ctx, save.cleared + ' of ' + TS.Levels.count + ' battles cleared',
+      TS.W / 2, d.y + 166, { size: 24, fill: '#7a6248', stroke: null });
+    TS.text(ctx, save.gold + ' gold earned', TS.W / 2, d.y + 206, {
+      size: 24, fill: '#7a6248', stroke: null
+    });
+    TS.text(ctx, 'It cannot be undone.', TS.W / 2, d.y + 262, {
+      size: 22, fill: '#9a7a5a', stroke: null
+    });
   }
 
   function goSelect() {
@@ -219,14 +261,14 @@
       (function (idx) {
         var unlocked = TS.Save.isUnlocked(idx);
         buttons.push(new TS.UI.Button({
-          x: 90, y: 302 + idx * 92, w: 652, h: 58,
+          x: 84, y: SELECT_TOP + idx * SELECT_PITCH, w: 664, h: 103,
           kind: 'none', id: 'lvl' + idx, enabled: unlocked,
           onTap: function () { startBattle(idx); }
         }));
       })(i);
     }
     buttons.push(new TS.UI.Button({
-      x: 256, y: 1120, w: 320, h: 132, kind: 'bigRed', label: 'BACK', labelSize: 38,
+      x: 256, y: 1216, w: 320, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 38,
       onTap: goTitle
     }));
   }
@@ -383,6 +425,7 @@
       else if (resultShown) drawResult();
     } else if (screen === 'title') {
       drawTitle();
+      if (confirmingReset) drawResetConfirm();
     } else if (screen === 'select') {
       drawSelect();
     }
@@ -473,8 +516,8 @@
       titleBases[i].draw(ctx);
     }
     for (i = 0; i < titleUnits.length; i++) {
-      TS.drawFrame(ctx, TS.SPR.shadow, 0, titleUnits[i].x, titleUnits[i].y,
-        { alpha: 0.5 });
+      var sr = TS.UNIT_DEFS[titleUnits[i].cls].body * 0.40;
+      TS.blobShadow(ctx, titleUnits[i].x, titleUnits[i].y - 3, sr, sr * 0.32, 0.27);
     }
     for (i = 0; i < titleUnits.length; i++) {
       var t = titleUnits[i];
@@ -505,9 +548,9 @@
 
   function drawSelect() {
     var UI = TS.UI;
-    ctx.fillStyle = 'rgba(14,22,19,0.42)';
+    ctx.fillStyle = 'rgba(14,22,19,0.52)';
     ctx.fillRect(0, 0, TS.W, TS.H);
-    UI.labelRibbon(ctx, 'big', 66, 134, TS.W - 132, UI.PLATE.teal, 'CHOOSE A BATTLE',
+    UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal, 'CHOOSE A BATTLE',
       { size: 42, stroke: '#25404a' });
   }
 
@@ -518,20 +561,21 @@
       var lv = TS.Levels.get(i);
       var unlocked = TS.Save.isUnlocked(i);
       var b = buttons[i];
-      var y = b.y;
       var pressed = b.pressed ? 3 : 0;
-
-      /* Ribbon art is 54px tall; the button rect is a little taller for a
-         comfortable touch target, so centre the art within it. */
-      var top = y + 2 + pressed;
-      UI.smallRibbon(ctx, b.x, top, b.w, unlocked ? UI.RIB.tealR : UI.RIB.greyR);
-      var mid = top + 27;
+      var top = b.y + pressed;
+      /* Big ribbon art is 103px tall, matching the button rect exactly. */
+      UI.bigRibbon(ctx, b.x, top, b.w, unlocked ? UI.PLATE.teal : UI.PLATE.black);
+      var mid = top + 51;
 
       ctx.save();
       if (!unlocked) ctx.globalAlpha = 0.72;
-      TS.text(ctx, (i + 1) + '.  ' + lv.name, b.x + 74, mid + 1, {
-        size: 25, fill: unlocked ? '#fff8e6' : '#c9c9c9',
+      TS.text(ctx, (i + 1) + '.  ' + lv.name, b.x + 118, mid - 12, {
+        size: 28, fill: unlocked ? '#fff8e6' : '#c9c9c9',
         stroke: unlocked ? '#264448' : '#2a2a2e', align: 'left'
+      });
+      TS.text(ctx, lv.objective, b.x + 120, mid + 20, {
+        size: 18, fill: unlocked ? '#cfe6dd' : '#a8a8a8',
+        stroke: unlocked ? '#223c42' : '#2a2a2e', align: 'left'
       });
       ctx.restore();
 
@@ -539,12 +583,12 @@
         var stars = TS.Save.stars(i);
         for (var s = 0; s < 3; s++) {
           ctx.save();
-          ctx.globalAlpha = s < stars ? 1 : 0.28;
-          UI.icon(ctx, 'icon05', b.x + b.w - 122 + s * 34, mid, 0.44);
+          ctx.globalAlpha = s < stars ? 1 : 0.26;
+          UI.icon(ctx, 'icon05', b.x + b.w - 148 + s * 38, mid, 0.5);
           ctx.restore();
         }
       } else {
-        UI.icon(ctx, 'icon06', b.x + b.w - 56, mid, 0.5);
+        UI.icon(ctx, 'icon06', b.x + b.w - 78, mid, 0.62);
       }
     }
   }

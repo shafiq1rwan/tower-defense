@@ -31,7 +31,7 @@ worker only registers over `http`/`https`.
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear button / `P` / `Esc` | Pause |
 
-Burn the goblin watchtower before the clock runs out. If time expires, whichever
+Burn down the goblin hut before the clock runs out. If time expires, whichever
 base is in better shape wins. Your army is capped at 14 on the field, so slots are
 a resource — the bar reads `ARMY FULL` when you're at the limit.
 
@@ -143,9 +143,12 @@ rediscovered. Several of these are traps that render *almost* correctly.
   like plain fill but carry a near-black right-hand outline (measured `#0b0e18`);
   tiling one paints a dark vertical seam every 64px across the entire field.
   Variation comes from random mirroring, not a second column.
-- **`Terrain/Ground/Shadows.png` is a grey rounded *square*** — a building blob,
-  not a unit drop shadow. `Terrain/Tileset/Shadow.png` is the soft ellipse whose
-  bottom edge aligns with the 192px unit foot anchor.
+- **BOTH shadow files are grey rounded *squares***, about as tall as they are
+  wide — `Terrain/Ground/Shadows.png` and `Terrain/Tileset/Shadow.png` alike. Used
+  as a drop shadow either one puts a grey block behind a unit's legs, so no shadow
+  sprite is loaded at all: unit shadows are drawn as flattened ellipses sized from
+  the measured body width, which also scales correctly for the 57px Barrel against
+  the 86px TNT goblin.
 - The older `Terrain/Tileset/Tilemap_color*.png` sheets are a different, weaker
   layout (3×3 autotile plus strip variants) with **no sand at all**.
 
@@ -173,9 +176,10 @@ rediscovered. Several of these are traps that render *almost* correctly.
 
 - **Every building has `_Destroyed` art**, so a fallen base leaves a wreck rather
   than vanishing.
-- **Neither base fills its frame**, and the frame width is the wrong thing to
-  measure against: the goblin tower's art is only 129px inside a 256px frame.
-  Draw-order and gate tests use measured art bounds instead.
+- **No building fills its frame**, and the frame width is the wrong thing to
+  measure against — `Tower_Blue` and `Goblin_House` are both only ~113px of art
+  inside a 128px frame, and the bases they replaced were wider still. Draw-order
+  and gate tests use measured art bounds instead.
 - **The UI sheets have inset art.** A slice's art does not start at its cell
   origin — `RegularPaper`'s top-left corner begins at x12,y20 of its cell, and
   `BigBar_Base`'s end caps are 24px wide, not 64. `TS.SLICE` / `TS.THREE` in
@@ -183,6 +187,16 @@ rediscovered. Several of these are traps that render *almost* correctly.
 - **The `*_Slots.png` files are not tileable fills.** Each has a ~12px transparent
   border, so tiling one produces a grid of see-through gutters. They are single
   decorative inset plates.
+- Several **icons sit 1–2px off-centre inside their 64px frames** (Icon_03's ink
+  centre is at 31,30), which reads as a badly centred glyph once it is inside a
+  button. `UI.icon` applies measured per-icon nudges.
 - `Arrow.png` is one static frame, rotated to its velocity.
+
+### Text
+
+- **Canvas `textBaseline: 'middle'` is not optically centred.** It aligns the
+  font's em box, which sits off-centre for all-caps and for digits, and left every
+  button label looking slightly high or low. `TS.text` measures the glyphs' real
+  ink box via `actualBoundingBoxAscent`/`Descent` and centres on that instead.
 
 The art is the Tiny Swords pack by Pixel Frog; only the code here is new.

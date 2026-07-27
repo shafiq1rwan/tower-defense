@@ -40,20 +40,20 @@
        the reference's dense clustered brawl. */
     lanes: [765, 835, 905],
 
-    /* Bases sit on the sand. The knights' castle is cropped by the left edge, but
-       the goblin tower's art is only 129px wide inside its 256px frame, so it is
-       placed to sit fully on screen instead of being cropped. */
+    /* Bases sit on the sand. Both buildings are ~113px of visible art inside a
+       128px frame, so each sits fully on screen rather than cropped, and the lane
+       between them is wide. */
     castleBaseY: 925,
-    playerCastleX: 20,    // art spans -136..175
-    enemyCastleX: 766,    // art spans 701..830
+    playerCastleX: 66,    // tower art spans 9..122
+    enemyCastleX: 768,    // hut art spans 711..823
 
-    playerFrontX: 168,
-    enemyFrontX: 694,
+    playerFrontX: 136,
+    enemyFrontX: 698,
     /* Spawns sit behind their own base art so units file out from behind it. */
-    playerSpawnX: 160,
-    enemySpawnX: 740,
+    playerSpawnX: 104,
+    enemySpawnX: 742,
 
-    laneLeft: 88,
+    laneLeft: 60,
     laneRight: 800
   };
   TS.LAY = LAY;

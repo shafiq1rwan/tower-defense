@@ -79,13 +79,24 @@
     return h;
   };
 
+  /* Nudges that centre each icon on its ARTWORK rather than on its 64px frame.
+     Measured ink centres, e.g. Icon_03's sits at 31,30 — small, but enough to
+     read as off-centre inside a button. */
+  var ICON_NUDGE = {
+    icon03: [1, 2], icon05: [1, 0], icon06: [1, 0],
+    icon09: [1, 0], icon12: [-1, 0]
+  };
+
   /* Icon at native 64px, optionally scaled about its centre. */
   UI.icon = function (ctx, key, cx, cy, scale) {
     var img = TS.img(key);
     if (!img) return;
     var s = scale || 1;
+    var n = ICON_NUDGE[key];
+    if (n) { cx += n[0] * s; cy += n[1] * s; }
     var w = img.width * s, h = img.height * s;
-    ctx.drawImage(img, Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(w), Math.round(h));
+    ctx.drawImage(img, Math.round(cx - w / 2), Math.round(cy - h / 2),
+      Math.round(w), Math.round(h));
   };
 
   /* --------------------------------------------------------------- button -- */
@@ -134,7 +145,7 @@
       }[k] || ['sqBlue', 'sqBluePressed'];
       var im = TS.img(down ? map[1] : map[0]);
       if (im) ctx.drawImage(im, Math.round(this.x - BTN_PAD_X), Math.round(this.y - BTN_PAD_Y));
-      if (down) dy = 8;   // keep the glyph on the squashed face
+      if (down) dy = 6;   // centre of the pressed face sits 6px lower
     }
 
     var cx = this.x + this.w / 2;
