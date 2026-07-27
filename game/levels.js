@@ -10,7 +10,11 @@
 (function (TS) {
   'use strict';
 
+  /* Player card classes. */
   var P = 'Pawn', W = 'Warrior', A = 'Archer', M = 'Monk', L = 'Lancer';
+  /* Enemy goblin classes. T = Torch (melee horde), N = TNT (area bomber),
+     B = Barrel (fast suicide keg). */
+  var T = 'Torch', N = 'TNT', B = 'Barrel';
 
   /* `buff` multiplies enemy HP and damage. It stays low deliberately: the enemy
      already gets free units, so a large multiplier on top makes late battles
@@ -20,94 +24,88 @@
   var LEVELS = [
     {
       name: 'First Blood',
-      objective: 'Destroy the Red Camp',
+      objective: 'Drive off the goblin scouts',
       cards: [P, W],
       playerHp: 400, enemyHp: 300,
       startGold: 150, goldRate: 14, goldCap: 340,
       buff: 1,
       timeLimit: 170,
       waves: [
-        { t: 4, cls: P, n: 2, gap: 0.6 },
-        { t: 16, cls: P, n: 3, gap: 0.5 },
-        { t: 30, cls: W, n: 1 },
-        { t: 42, cls: P, n: 3, gap: 0.4 },
-        { t: 56, cls: W, n: 2, gap: 0.8 }
+        { t: 4, cls: T, n: 2, gap: 0.7 },
+        { t: 20, cls: T, n: 3, gap: 0.6 },
+        { t: 40, cls: T, n: 3, gap: 0.6 },
+        { t: 60, cls: T, n: 2, gap: 0.6 }
       ],
-      endless: { every: 12, cap: 4, classes: [P, P, W] }
+      endless: { every: 13, cap: 3, classes: [T, T] }
     },
     {
-      name: 'Archers on the Ridge',
-      objective: 'Break the Red line',
+      name: 'Powder and Fuse',
+      objective: 'Silence the TNT throwers',
       cards: [P, W, A],
       playerHp: 400, enemyHp: 370,
       startGold: 160, goldRate: 15, goldCap: 380,
       buff: 1,
       timeLimit: 180,
       waves: [
-        { t: 3, cls: P, n: 3, gap: 0.5 },
-        { t: 12, cls: A, n: 1 },
-        { t: 22, cls: P, n: 3, gap: 0.4 },
-        { t: 32, cls: A, n: 2, gap: 1.0 },
-        { t: 44, cls: W, n: 2, gap: 0.7 },
-        { t: 58, cls: A, n: 2, gap: 0.9 }
+        { t: 4, cls: T, n: 3, gap: 0.6 },
+        { t: 18, cls: N, n: 1 },
+        { t: 30, cls: T, n: 3, gap: 0.5 },
+        { t: 46, cls: N, n: 2, gap: 1.4 },
+        { t: 62, cls: T, n: 3, gap: 0.5 }
       ],
-      endless: { every: 11, cap: 4, classes: [P, A, W, P] }
+      endless: { every: 12, cap: 4, classes: [T, N, T] }
     },
     {
-      name: 'Shield Wall',
-      objective: 'Grind through the Warriors',
+      name: 'The Green Tide',
+      objective: 'Hold against the horde',
       cards: [P, W, A],
       playerHp: 420, enemyHp: 430,
       startGold: 170, goldRate: 16, goldCap: 420,
       buff: 1,
       timeLimit: 190,
       waves: [
-        { t: 3, cls: W, n: 2, gap: 0.9 },
-        { t: 14, cls: P, n: 4, gap: 0.35 },
-        { t: 26, cls: W, n: 2, gap: 0.8 },
-        { t: 38, cls: A, n: 2, gap: 0.9 },
-        { t: 50, cls: W, n: 3, gap: 0.7 },
-        { t: 64, cls: P, n: 5, gap: 0.3 }
+        { t: 3, cls: T, n: 4, gap: 0.5 },
+        { t: 18, cls: T, n: 4, gap: 0.45 },
+        { t: 34, cls: N, n: 2, gap: 1.2 },
+        { t: 50, cls: T, n: 5, gap: 0.4 }
       ],
-      endless: { every: 10, cap: 5, classes: [W, P, P, A] }
+      endless: { every: 11, cap: 4, classes: [T, T, N, T] }
     },
     {
-      name: 'Field Medic',
-      objective: 'Outlast the healers',
+      name: 'Rolling Thunder',
+      objective: 'Stop the barrel bombs',
       cards: [P, W, A, M],
       playerHp: 440, enemyHp: 470,
       startGold: 190, goldRate: 17, goldCap: 460,
       buff: 1.04,
       timeLimit: 200,
       waves: [
-        { t: 3, cls: P, n: 3, gap: 0.45 },
-        { t: 12, cls: M, n: 1 },
-        { t: 20, cls: W, n: 2, gap: 0.8 },
-        { t: 32, cls: A, n: 2, gap: 0.8 },
-        { t: 42, cls: M, n: 1 },
-        { t: 52, cls: W, n: 3, gap: 0.6 },
-        { t: 66, cls: P, n: 4, gap: 0.3 }
+        { t: 3, cls: T, n: 3, gap: 0.5 },
+        { t: 16, cls: B, n: 1 },
+        { t: 28, cls: N, n: 2, gap: 1.1 },
+        { t: 42, cls: T, n: 4, gap: 0.45 },
+        { t: 56, cls: B, n: 1 },
+        { t: 70, cls: T, n: 5, gap: 0.4 }
       ],
-      endless: { every: 10, cap: 5, classes: [P, W, A, M, P] }
+      endless: { every: 11, cap: 5, classes: [T, N, B, T] }
     },
     {
-      name: 'The Long Reach',
-      objective: 'Answer the Red Lancer',
+      name: 'Blast Radius',
+      objective: 'Mind the dynamite',
       cards: [P, W, A, M, L],
       playerHp: 460, enemyHp: 520,
       startGold: 210, goldRate: 18, goldCap: 520,
       buff: 1.06,
       timeLimit: 215,
       waves: [
-        { t: 3, cls: P, n: 4, gap: 0.4 },
-        { t: 14, cls: L, n: 1 },
-        { t: 26, cls: A, n: 2, gap: 0.8 },
-        { t: 38, cls: W, n: 3, gap: 0.6 },
-        { t: 50, cls: L, n: 1 },
-        { t: 60, cls: M, n: 1 },
-        { t: 72, cls: P, n: 4, gap: 0.3 }
+        { t: 3, cls: T, n: 4, gap: 0.45 },
+        { t: 18, cls: N, n: 2, gap: 1.0 },
+        { t: 32, cls: B, n: 2, gap: 2.2 },
+        { t: 46, cls: T, n: 4, gap: 0.4 },
+        { t: 60, cls: N, n: 2, gap: 1.0 },
+        { t: 76, cls: T, n: 3, gap: 0.4 }
       ],
-      endless: { every: 9.5, cap: 5, classes: [W, A, P, L, M] }
+      endless: { every: 10, cap: 5, classes: [T, N, T, B, T] }
     },
     {
       name: 'Two Fronts',
@@ -118,55 +116,52 @@
       buff: 1.08,
       timeLimit: 230,
       waves: [
-        { t: 2, cls: P, n: 5, gap: 0.3 },
-        { t: 14, cls: W, n: 3, gap: 0.6 },
-        { t: 26, cls: A, n: 3, gap: 0.7 },
-        { t: 36, cls: L, n: 1 },
-        { t: 46, cls: M, n: 2, gap: 1.2 },
-        { t: 58, cls: W, n: 3, gap: 0.5 },
-        { t: 72, cls: L, n: 1 }
+        { t: 2, cls: T, n: 5, gap: 0.4 },
+        { t: 16, cls: N, n: 2, gap: 1.0 },
+        { t: 30, cls: B, n: 2, gap: 1.8 },
+        { t: 44, cls: T, n: 5, gap: 0.4 },
+        { t: 58, cls: N, n: 2, gap: 0.9 },
+        { t: 74, cls: T, n: 3, gap: 0.4 }
       ],
-      endless: { every: 9, cap: 6, classes: [P, W, A, L, P, M] }
+      endless: { every: 9.5, cap: 5, classes: [T, N, B, T, N] }
     },
     {
       name: 'Iron Tide',
-      objective: 'Survive the assault and break through',
+      objective: 'Survive the assault, then break through',
       cards: [P, W, A, M, L],
       playerHp: 500, enemyHp: 640,
       startGold: 250, goldRate: 22, goldCap: 620,
       buff: 1.11,
       timeLimit: 245,
       waves: [
-        { t: 2, cls: W, n: 3, gap: 0.5 },
-        { t: 12, cls: P, n: 5, gap: 0.25 },
-        { t: 24, cls: A, n: 3, gap: 0.6 },
-        { t: 34, cls: L, n: 1 },
-        { t: 46, cls: M, n: 2, gap: 1.0 },
-        { t: 56, cls: W, n: 3, gap: 0.45 },
-        { t: 70, cls: A, n: 3, gap: 0.5 },
-        { t: 84, cls: L, n: 1 }
+        { t: 2, cls: T, n: 5, gap: 0.4 },
+        { t: 16, cls: N, n: 3, gap: 0.9 },
+        { t: 30, cls: B, n: 2, gap: 1.6 },
+        { t: 44, cls: T, n: 5, gap: 0.35 },
+        { t: 58, cls: N, n: 3, gap: 0.8 },
+        { t: 74, cls: B, n: 1 },
+        { t: 86, cls: T, n: 3, gap: 0.35 }
       ],
-      endless: { every: 8.5, cap: 6, classes: [W, P, A, L, M, W] }
+      endless: { every: 9, cap: 6, classes: [T, N, B, T, N, T] }
     },
     {
-      name: 'The Red Keep',
-      objective: 'Take the Keep',
+      name: 'The Goblin Camp',
+      objective: 'Burn the watchtower',
       cards: [P, W, A, M, L],
       playerHp: 520, enemyHp: 720,
       startGold: 280, goldRate: 24, goldCap: 700,
       buff: 1.15,
       timeLimit: 260,
       waves: [
-        { t: 2, cls: P, n: 5, gap: 0.25 },
-        { t: 12, cls: W, n: 4, gap: 0.5 },
-        { t: 24, cls: A, n: 3, gap: 0.5 },
-        { t: 34, cls: L, n: 2, gap: 1.2 },
-        { t: 46, cls: M, n: 2, gap: 0.9 },
-        { t: 58, cls: W, n: 4, gap: 0.4 },
-        { t: 72, cls: L, n: 2, gap: 1.0 },
-        { t: 86, cls: A, n: 3, gap: 0.4 }
+        { t: 2, cls: T, n: 6, gap: 0.35 },
+        { t: 16, cls: N, n: 3, gap: 0.8 },
+        { t: 30, cls: B, n: 2, gap: 1.5 },
+        { t: 44, cls: T, n: 6, gap: 0.35 },
+        { t: 60, cls: N, n: 3, gap: 0.8 },
+        { t: 76, cls: B, n: 2, gap: 1.4 },
+        { t: 92, cls: T, n: 3, gap: 0.3 }
       ],
-      endless: { every: 8, cap: 6, classes: [W, A, P, L, M, W, A] }
+      endless: { every: 8.5, cap: 6, classes: [T, N, B, T, N, T, B] }
     }
   ];
 

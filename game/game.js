@@ -12,6 +12,7 @@
   var canvas, ctx;
   var last = 0, acc = 0;
   var uiClock = 0;
+  var lastDt = 0;
   var speed = 1;
   var paused = false;
 
@@ -25,6 +26,7 @@
   var buttons = [];        // active clickables for the current screen
   var hud = null;          // battle-screen widgets
   var titleUnits = [];
+  var titleBases = [];
 
   var pointer = { x: -999, y: -999, down: false, target: null, hand: false, touch: false };
 
@@ -326,6 +328,7 @@
     var dt = Math.min(0.25, (now - last) / 1000);
     last = now;
     uiClock += dt;
+    lastDt = dt;
 
     if (screen === 'battle' && !paused) {
       acc += dt * speed;
@@ -370,7 +373,7 @@
       battle.draw(ctx);
       TS.FX.drawNumbers(ctx);
     } else if (screen === 'title') {
-      drawTitleUnits();
+      drawTitleUnits(lastDt);
     }
     ctx.restore();
 
@@ -439,20 +442,19 @@
     }
   }
 
-  /* A handful of units idling on the plateau behind the title. */
+  /* Knights and goblins squared up on the sand behind the title. */
   function buildTitleUnits() {
     var rnd = TS.rng(77);
     titleUnits = [];
-    /* Kept clear of the castles, which are cropped by the screen edges and
-       occupy roughly x<200 and x>630. */
+    /* Clear of both bases: the castle art ends at x=175, the goblin tower's
+       begins at x=701. */
     var picks = [
-      ['Warrior', true, 252, 0], ['Pawn', true, 306, 1], ['Archer', true, 360, 2],
-      ['Lancer', false, 580, 0], ['Monk', false, 526, 1], ['Pawn', false, 472, 2]
+      ['Warrior', true, 258, 0], ['Pawn', true, 312, 1], ['Archer', true, 366, 2],
+      ['Torch', false, 588, 0], ['TNT', false, 534, 1], ['Barrel', false, 480, 2]
     ];
     for (var i = 0; i < picks.length; i++) {
       titleUnits.push({
         cls: picks[i][0],
-        team: picks[i][1] ? 'Blue' : 'Red',
         flip: !picks[i][1],
         x: picks[i][2],
         y: TS.LAY.lanes[picks[i][3]],
@@ -460,19 +462,23 @@
       });
     }
     titleUnits.sort(function (a, b) { return a.y - b.y; });
+    /* Built once — allocating bases every frame was pure waste. */
+    titleBases = [new TS.Base(true, 1), new TS.Base(false, 1)];
   }
 
-  function drawTitleUnits() {
-    var pc = new TS.Castle('Blue', true, 1);
-    var ec = new TS.Castle('Red', false, 1);
-    pc.draw(ctx); ec.draw(ctx);
-    for (var i = 0; i < titleUnits.length; i++) {
-      var u = titleUnits[i];
-      TS.drawFrame(ctx, TS.SPR.shadow, 0, u.x, u.y, { alpha: 0.5 });
+  function drawTitleUnits(dt) {
+    var i;
+    for (i = 0; i < titleBases.length; i++) {
+      titleBases[i].anim += 6 * dt;
+      titleBases[i].draw(ctx);
     }
-    for (var j = 0; j < titleUnits.length; j++) {
-      var t = titleUnits[j];
-      var spr = TS.SPR.unit[t.team][t.cls].idle;
+    for (i = 0; i < titleUnits.length; i++) {
+      TS.drawFrame(ctx, TS.SPR.shadow, 0, titleUnits[i].x, titleUnits[i].y,
+        { alpha: 0.5 });
+    }
+    for (i = 0; i < titleUnits.length; i++) {
+      var t = titleUnits[i];
+      var spr = TS.SPR.unit[t.cls].idle;
       var fps = TS.UNIT_DEFS[t.cls].fps.idle;
       TS.drawFrame(ctx, spr, ((uiClock + t.phase) * fps) | 0, t.x, t.y, { flip: t.flip });
     }
@@ -563,12 +569,17 @@
       titleRow: won ? UI.PLATE.teal : UI.PLATE.red
     });
 
-    /* Drawn at native 256 rather than scaled down: the portrait only occupies
-       about 196x182 of its frame, so shrinking it makes the face unreadable. */
-    var avatar = TS.img(TS.avatarKey(won ? 'Blue' : 'Red',
-      won ? 'Warrior' : 'Lancer'));
-    if (avatar) {
-      ctx.drawImage(avatar, Math.round(TS.W / 2 - 128), Math.round(d.y + 34));
+    if (won) {
+      /* Drawn at native 256 rather than scaled down: the portrait only occupies
+         about 196x182 of its frame, so shrinking it makes the face unreadable. */
+      var avatar = TS.img(TS.avatarKey('Blue', 'Warrior'));
+      if (avatar) ctx.drawImage(avatar, Math.round(TS.W / 2 - 128), Math.round(d.y + 34));
+    } else {
+      /* The Goblin faction ships no portraits, so the victor takes the stage in
+         person — a Torch goblin, idling and pleased with itself. */
+      var gob = TS.SPR.unit.Torch.idle;
+      TS.drawFrame(ctx, gob, (uiClock * 8) | 0, TS.W / 2, d.y + 250,
+        { scale: 1.6, flip: true });
     }
 
     var rows = [
@@ -638,7 +649,7 @@
         out.byClass[(u.isPlayer ? 'B:' : 'R:') + u.cls] =
           (out.byClass[(u.isPlayer ? 'B:' : 'R:') + u.cls] || 0) + 1;
       });
-      out.arrows = battle.arrows.length;
+      out.arrows = battle.projectiles.length;
       out.playerHp = Math.round(battle.playerCastle.hp);
       out.enemyHp = Math.round(battle.enemyCastle.hp);
       out.over = battle.over;

@@ -56,10 +56,17 @@
   };
 
   FX.explosion = function (x, y, big) {
-    FX.burst(TS.SPR.fx[big ? 'explosion2' : 'explosion1'], x, y, {
-      fps: big ? 16 : 20, scale: big ? 1.35 : 1
+    FX.burst(TS.SPR.fx.boom, x, y, {
+      fps: big ? 15 : 19, scale: big ? 1.3 : 0.95
     });
     FX.shake(big ? 16 : 7);
+  };
+
+  /* The full pack's death effect: a bright flash, then a skull that settles and
+     sinks away. Drawn behind the units, since it belongs on the ground — the
+     opening flash is bright enough to read through a crowd regardless. */
+  FX.death = function (x, y) {
+    FX.burst(TS.SPR.dead, x, y, { fps: 12, back: true, fade: false });
   };
 
   /* Heal_Effect is a separate 11-frame overlay layer that sits on the healed

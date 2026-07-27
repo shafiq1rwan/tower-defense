@@ -46,13 +46,20 @@ window.TS = window.TS || {};
 
   /* ------------------------------------------------------------- sprites -- */
 
-  /* A sprite is one horizontal strip. ax/ay is the anchor inside a frame. */
-  TS.sprite = function (img, fw, fh, count, ax, ay) {
+  /* A sprite is one horizontal run of frames. ax/ay is the anchor inside a frame.
+     `row` selects a row of a multi-row sheet — the Goblin troops and the Dead
+     effect ship as grids rather than single strips, and a row may use fewer
+     columns than the sheet is wide. */
+  /* `cols` lets an animation WRAP across rows — the Dead effect is 14 frames laid
+     out 7 wide over two rows. Defaults to `count`, i.e. a single row. */
+  TS.sprite = function (img, fw, fh, count, ax, ay, row, cols) {
     return {
       img: img,
       fw: fw,
       fh: fh,
       count: count,
+      row: row || 0,
+      cols: cols || count,
       ax: ax == null ? fw / 2 : ax,
       ay: ay == null ? fh : ay
     };
@@ -95,7 +102,14 @@ window.TS = window.TS || {};
     var fw = spr.fw, fh = spr.fh;
     var flip = !!o.flip;
     var img = flip ? mirrored(spr.img) : spr.img;
-    var sx = flip ? img.width - (f + 1) * fw : f * fw;
+    /* Grid position, wrapping to the next row every `cols` frames. On the
+       mirrored copy, source column c lives at (cols-1-c), which is what
+       img.width - (col+1)*fw evaluates to — correct even when a row uses fewer
+       columns than the sheet is wide. */
+    var perRow = spr.cols || n;
+    var col = f % perRow;
+    var sx = flip ? img.width - (col + 1) * fw : col * fw;
+    var sy = ((spr.row || 0) + Math.floor(f / perRow)) * fh;
     var ax = flip ? fw - spr.ax : spr.ax;
     var ay = spr.ay;
 
@@ -114,19 +128,19 @@ window.TS = window.TS || {};
       /* Fast path: integer-aligned blit, no transform. */
       dx = Math.round(x - ax);
       dy = Math.round(y - ay);
-      ctx.drawImage(img, sx, 0, fw, fh, dx, dy, fw, fh);
+      ctx.drawImage(img, sx, sy, fw, fh, dx, dy, fw, fh);
     } else {
       ctx.save();
       ctx.translate(Math.round(x), Math.round(y));
       if (o.rot) ctx.rotate(o.rot);
-      ctx.drawImage(img, sx, 0, fw, fh, -ax * sxScale, -ay * syScale, dw, dh);
+      ctx.drawImage(img, sx, sy, fw, fh, -ax * sxScale, -ay * syScale, dw, dh);
       ctx.restore();
     }
 
     /* Silhouette overlay for hit flashes / heal glows. */
     if (o.flash > 0) {
       sctx.clearRect(0, 0, fw, fh);
-      sctx.drawImage(img, sx, 0, fw, fh, 0, 0, fw, fh);
+      sctx.drawImage(img, sx, sy, fw, fh, 0, 0, fw, fh);
       sctx.globalCompositeOperation = 'source-atop';
       sctx.fillStyle = o.flashColor || '#ffffff';
       sctx.fillRect(0, 0, fw, fh);

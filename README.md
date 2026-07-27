@@ -1,11 +1,12 @@
 # Tiny Swords: Lane Siege
 
-A portrait lane-battler built on the Pixel Frog *Tiny Swords* free art pack, in the
-style of `reference.jpg`: two castles face each other across a single lane, your
-units auto-advance and brawl where they meet, and you spend regenerating gold on
-summon cards along the bottom of the screen.
+A portrait lane-battler built on the Pixel Frog *Tiny Swords* pack, in the style of
+`reference.jpg`: your knights and a goblin warband face each other across a sand
+lane, units auto-advance and brawl where they meet, and you spend regenerating
+gold on summon cards along the bottom of the screen.
 
-Eight hand-tuned battles, five unit classes, progress saved locally.
+Eight hand-tuned battles, five playable classes, three goblin enemy types,
+progress saved locally. Installs as a PWA and plays offline.
 
 ## Running it
 
@@ -21,55 +22,6 @@ from `file://`, which is why the code uses classic `<script>` tags rather than E
 modules). A server is still the safer bet if you switch browsers, and the service
 worker only registers over `http`/`https`.
 
-## Hosting on GitHub Pages
-
-Push the whole folder and enable Pages on the branch — there is no build step.
-It installs as a PWA and plays offline.
-
-Everything is already set up for a project subpath (`user.github.io/repo/`):
-every path in the HTML, manifest and service worker is **relative**, so the same
-files work at a domain root or in a subfolder without edits.
-
-Two GitHub-Pages-specific files are included:
-
-- **`.nojekyll`** — stops Jekyll from processing the site. Without it Jekyll can
-  mangle or skip paths, and this project has folder names containing spaces.
-- **`.gitignore`** — keeps the `.DS_Store` files scattered through the asset
-  folders out of the repo, and skips the `.aseprite` sources (delete that line if
-  you want the art originals versioned).
-
-### After changing anything in `game/`
-
-**Bump `VERSION` in `sw.js`.** The service worker caches aggressively, so
-returning visitors keep running the old copy until that string changes.
-
-### Case sensitivity
-
-GitHub Pages serves from Linux, which is case-sensitive; Windows and macOS are
-not. A path like `Units/blue Units/...` therefore works locally and 404s once
-deployed. All 132 asset paths in this project have been checked segment by
-segment against the real filenames, so they match exactly — but keep it in mind
-if you add art.
-
-### PWA pieces
-
-| File | Purpose |
-|---|---|
-| `manifest.webmanifest` | Install metadata: portrait lock, standalone display, theme colours |
-| `sw.js` | Offline caching — shell precached on install, art cached on first play |
-| `icons/` | 192 and 512 icons, a maskable 512, and a 180 Apple touch icon |
-
-The ~130 sprite sheets are deliberately **not** listed in `sw.js`. Duplicating the
-manifest from `assets.js` would drift the first time either changed, so instead
-the page posts the exact list it just loaded to the worker, which stores it. That
-also covers the very first visit, where the images are fetched while the worker is
-still installing and so never pass through its `fetch` handler at all — without
-that step, someone who installed the game and immediately went offline would get
-the code but no graphics.
-
-Verified offline: with the network disabled and the page reloaded, the game
-reaches the title screen and plays a full battle with zero failed requests.
-
 ## Playing
 
 | Input | Action |
@@ -79,11 +31,11 @@ reaches the title screen and plays a full battle with zero failed requests.
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear button / `P` / `Esc` | Pause |
 
-Destroy the enemy castle before the clock runs out. If time expires, whoever's
-castle is in better shape wins. Your army is capped at 14 on the field, so slots
-are a resource — the bar reads `ARMY FULL` when you're at the limit.
+Burn the goblin watchtower before the clock runs out. If time expires, whichever
+base is in better shape wins. Your army is capped at 14 on the field, so slots are
+a resource — the bar reads `ARMY FULL` when you're at the limit.
 
-### The roster
+### Your roster
 
 | Unit | Cost | Role |
 |---|---|---|
@@ -93,13 +45,22 @@ are a resource — the bar reads `ARMY FULL` when you're at the limit.
 | Monk | 120 | Heals the most wounded ally nearby |
 | Lancer | 200 | Slow and brutal, striking from behind the front rank |
 
-Spamming Pawns will carry you through the first two battles and then stop
-working. Later battles need a real composition.
+### The goblins
+
+| Enemy | Threat |
+|---|---|
+| Torch Goblin | The horde staple — moderate melee, arrives constantly |
+| TNT Goblin | Lobs dynamite that detonates in an *area*, so a packed line takes the hit together |
+| Barrel Bomb | A fast rolling keg that detonates on contact. Kill it at range or it takes your front rank with it |
+
+Spamming Pawns will carry you through the first five battles and then stop
+working — the area attacks punish clumped cheap units, so the later battles need a
+real composition.
 
 ## How it's built
 
-Vanilla JS and Canvas 2D — no build step, no dependencies. Classic `<script>`
-tags sharing a single global `TS` namespace.
+Vanilla JS and Canvas 2D — no build step, no dependencies. Classic `<script>` tags
+sharing a single global `TS` namespace.
 
 ```
 index.html
@@ -113,44 +74,115 @@ game/
   assets.js         manifest, loader, sprite registry
   audio.js          procedural WebAudio SFX (the pack ships no audio)
   save.js           localStorage progress
-  terrain.js        autotiled field + raised plateau, pre-rendered once
+  terrain.js        grass field + sand lane, pre-rendered once
   scene.js          animated scenery and cloud drift
   fx.js             particles, floating numbers, screen shake
-  entities.js       unit stats, combat, castles, projectiles
+  entities.js       unit stats, combat, bases, projectiles
   levels.js         the eight battle scripts
   ui.js             HUD, summon cards, panels, dialogs
   game.js           canvas scaling, fixed-step loop, screens, input
 ```
 
-The simulation runs in fixed 1/60s steps and fast-forward just feeds it more
-steps per frame, so 1× / 2× / 3× cannot change a battle's outcome. UI animation
-uses a separate real-time clock so the interface stays calm while sped up.
+The simulation runs in fixed 1/60s steps and fast-forward just feeds it more steps
+per frame, so 1× / 2× / 3× cannot change a battle's outcome. UI animation uses a
+separate real-time clock so the interface stays calm while sped up.
 
-### Notes on the art pack
+Sprites are keyed by **class alone** — each class belongs to exactly one faction,
+so there is no team dimension to thread through.
 
-Things that cost time to work out, recorded so they don't have to be rediscovered:
+## Hosting on GitHub Pages
 
-- **The tileset is a 3×3 autotile plus strip variants, not a 4×4 grid.** Only
-  `c1r1` (flat grass) and `c6r1` (elevated) are pure interior cells. Tiling any
-  other cell paints a visible lattice of seams across the whole field.
-- **There is no dirt or sand tile** in any of the five palette variants, so the
-  reference's tan lane is a *raised plateau* instead: olive grass over the
-  blue-grey stone cliff, on a vivid green field.
+Push the whole folder and enable Pages on the branch — there is no build step.
+Every path in the HTML, manifest and service worker is **relative**, so the same
+files work at a domain root or under a project subpath (`user.github.io/repo/`).
+
+- **`.nojekyll`** stops Jekyll from processing the site. Without it Jekyll can
+  mangle or skip paths, and this project has folder names containing spaces.
+- **`.gitignore`** keeps the `.DS_Store` files out of the repo and skips the
+  `.aseprite` sources (delete that line to version the art originals).
+
+### After changing anything in `game/`
+
+**Bump `VERSION` in `sw.js`.** The worker caches aggressively, so returning
+visitors keep running the old copy until that string changes. This is not
+theoretical — during development the worker served a stale `levels.js` and the
+enemy kept spawning the previous faction until the version was bumped.
+
+### Case sensitivity
+
+GitHub Pages serves from Linux, which is case-sensitive; Windows and macOS are
+not. A path like `factions/goblins/...` therefore works locally and 404s once
+deployed. All 134 asset paths are checked segment by segment against the real
+filenames — worth re-checking if you add art, especially under `Factions/`.
+
+### Offline caching
+
+The ~130 sprite sheets are deliberately **not** listed in `sw.js`. Duplicating the
+manifest from `assets.js` would drift the first time either changed, so the page
+posts the exact list it just loaded to the worker, which stores it. That also
+covers the very first visit, where the images are fetched while the worker is
+still installing and so never pass through its `fetch` handler — without that
+step, someone who installed the game and immediately went offline would get the
+code but no graphics.
+
+Verified: with the network disabled and the page reloaded, the game reaches the
+title screen and plays a full battle with zero failed requests.
+
+## Notes on the art pack
+
+Things that cost real time to work out, recorded so they don't have to be
+rediscovered. Several of these are traps that render *almost* correctly.
+
+### Terrain
+
+- **`Terrain/Ground/Tilemap_Flat.png` carries grass AND sand 4×4 autotiles side by
+  side** (grass `c0-c3`, sand `c5-c8`). The sand is what lets the battle lane match
+  the reference. Rows are `[top fringe, interior, interior, bottom fringe]`.
+- **Columns are `[left edge, INTERIOR, right edge, 1-wide]`, so each material has
+  exactly ONE interior column** — `c1` for grass, `c6` for sand. `c2`/`c7` look
+  like plain fill but carry a near-black right-hand outline (measured `#0b0e18`);
+  tiling one paints a dark vertical seam every 64px across the entire field.
+  Variation comes from random mirroring, not a second column.
+- **`Terrain/Ground/Shadows.png` is a grey rounded *square*** — a building blob,
+  not a unit drop shadow. `Terrain/Tileset/Shadow.png` is the soft ellipse whose
+  bottom edge aligns with the 192px unit foot anchor.
+- The older `Terrain/Tileset/Tilemap_color*.png` sheets are a different, weaker
+  layout (3×3 autotile plus strip variants) with **no sand at all**.
+
+### Units
+
+- **Goblin troops are multi-row GRIDS, not one file per animation**, and row
+  lengths are shorter than the sheet is wide, so both the row index and its frame
+  count matter. `Torch_Red.png` is 7×5 of 192px; `TNT_Red.png` is 7×3.
+- **`Barrel_Red.png` is 128px frames, not 192** (6×6, not 4×4). It is a TNT keg
+  rather than a goblin — row 1 is its roll cycle, row 5 the detonation.
+- **The Torch's rows 2, 3 and 4 are three DIRECTIONAL swings** (level, low,
+  overhead). Only row 2 reads correctly side-on; the others hunch the goblin over
+  as though striking at the ground.
+- **`Factions/Knights/Troops/Dead/Dead.png` is a real death effect** — a flash,
+  then a skull that settles and sinks — laid out 14 frames, 7 wide, across two
+  rows. Faction neutral, so it serves knights and goblins alike.
+- Knights only face right; every sheet is mirrored once at load and cached.
+- **The Lancer is the only class on 320×320 frames** and has its own anchor;
+  the other knights are 192×192 anchored at (96, 135), goblins at (96, 133).
+- Frame counts were verified against the sheets, not derived from image width.
+  Several don't match the obvious guess — the Monk's `Heal` is 11 frames, and the
+  `Clouds_*` files are single sprites rather than grids.
+
+### Buildings and UI
+
+- **Every building has `_Destroyed` art**, so a fallen base leaves a wreck rather
+  than vanishing.
+- **Neither base fills its frame**, and the frame width is the wrong thing to
+  measure against: the goblin tower's art is only 129px inside a 256px frame.
+  Draw-order and gate tests use measured art bounds instead.
 - **The UI sheets have inset art.** A slice's art does not start at its cell
   origin — `RegularPaper`'s top-left corner begins at x12,y20 of its cell, and
   `BigBar_Base`'s end caps are 24px wide, not 64. `TS.SLICE` / `TS.THREE` in
   `gfx.js` hold the measured bounds; slicing on the cell grid leaves gaps.
-- **The `*_Slots.png` files are not tileable fills.** Each has a ~12px
-  transparent border, so tiling one produces a grid of see-through gutters.
-  They are single decorative inset plates.
-- **No death, hurt, or damaged-building frames exist.** Deaths are a flash, fade
-  and dust puff; damaged castles get fire plumes and an explosion when they fall.
-- **`Arrow.png` is one static frame**, rotated to its velocity.
-- **Units only face right** — every sheet is mirrored once at load and cached.
-- **The Lancer is the only class on 320×320 frames** and has its own anchor;
-  everyone else is 192×192 anchored at (96, 135).
-- Frame counts were verified against the sheets, not derived from image width.
-  Several don't match the obvious guess: the Monk's `Heal` is 11 frames, and the
-  `Clouds_*` files are single sprites rather than grids.
+- **The `*_Slots.png` files are not tileable fills.** Each has a ~12px transparent
+  border, so tiling one produces a grid of see-through gutters. They are single
+  decorative inset plates.
+- `Arrow.png` is one static frame, rotated to its velocity.
 
-The art is the Tiny Swords free pack by Pixel Frog; only the code here is new.
+The art is the Tiny Swords pack by Pixel Frog; only the code here is new.

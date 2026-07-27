@@ -16,9 +16,52 @@
   var TER = 'Terrain/';
   var FX = 'Particle FX/';
 
-  /* Player is Blue, enemy is Red. The pack ships real palette variants, so no
-     runtime recolouring is needed. */
-  TS.TEAMS = ['Blue', 'Red'];
+  /* Two factions. The player fields blue Knights; the enemy fields red Goblins.
+     Because each class belongs to exactly one faction, sprites are keyed by class
+     alone — there is no team dimension to carry around. */
+  TS.CLASSES = ['Pawn', 'Warrior', 'Archer', 'Monk', 'Lancer'];
+  TS.ENEMY_CLASSES = ['Torch', 'TNT', 'Barrel'];
+
+  /* Frame size and foot anchor per class, measured from the sheets. Feet land on
+     the same ground line for every class so mixed ranks line up. */
+  var CLASS_META = {
+    Pawn: { frame: 192, anchor: [96, 135] },
+    Warrior: { frame: 192, anchor: [96, 135] },
+    Archer: { frame: 192, anchor: [96, 135] },
+    Monk: { frame: 192, anchor: [96, 135] },
+    /* The only class on 320px frames. */
+    Lancer: { frame: 320, anchor: [160, 202] },
+    Torch: { frame: 192, anchor: [96, 133] },
+    TNT: { frame: 192, anchor: [96, 133] },
+    /* A rolling barrel bomb — smaller frames than the humanoids. */
+    Barrel: { frame: 128, anchor: [64, 99] }
+  };
+  TS.unitFrameSize = function (cls) { return CLASS_META[cls].frame; };
+  TS.unitAnchor = function (cls) { return CLASS_META[cls].anchor; };
+
+  /* Goblin troops ship as multi-row GRIDS rather than one file per animation:
+     [row, frameCount]. Row lengths vary and are shorter than the sheet is wide,
+     so both numbers matter. Verified by rendering each sheet as a labelled grid.
+     The Barrel is on 128px frames and is a TNT keg, not a goblin — row 1 is its
+     roll cycle and row 5 is the detonation. */
+  var GOBLIN_SHEETS = {
+    /* Rows 2, 3 and 4 are three DIRECTIONAL swings (level, low, overhead). Only
+       row 2 reads correctly in a side-on fight — the others hunch the goblin over
+       as though striking at the ground. */
+    Torch: {
+      file: 'Factions/Goblins/Troops/Torch/Red/Torch_Red.png',
+      anims: { idle: [0, 7], run: [1, 6], attack: [2, 6] }
+    },
+    TNT: {
+      file: 'Factions/Goblins/Troops/TNT/Red/TNT_Red.png',
+      anims: { idle: [0, 6], run: [1, 6], attack: [2, 7] }
+    },
+    Barrel: {
+      file: 'Factions/Goblins/Troops/Barrel/Red/Barrel_Red.png',
+      anims: { idle: [0, 1], run: [1, 6], attack: [5, 3] }
+    }
+  };
+  TS.GOBLIN_SHEETS = GOBLIN_SHEETS;
 
   /* Per-class sheets: [file, frameCount]. The Pawn has no attack animation, so
      it uses the Knife carry variants throughout and stabs with Interact Knife.
@@ -54,20 +97,10 @@
     }
   };
   TS.UNIT_SHEETS = UNIT_SHEETS;
-  TS.CLASSES = ['Pawn', 'Warrior', 'Archer', 'Monk', 'Lancer'];
-
-  /* The Lancer is the only class on 320px frames, and its anchor differs. */
-  var FRAME = { Lancer: 320 };
-  var ANCHOR = { Lancer: [160, 202] };
-  var DEFAULT_FRAME = 192;
-  var DEFAULT_ANCHOR = [96, 135];
-
-  TS.unitFrameSize = function (cls) { return FRAME[cls] || DEFAULT_FRAME; };
-  TS.unitAnchor = function (cls) { return ANCHOR[cls] || DEFAULT_ANCHOR; };
 
   /* Avatar sheets are grouped in blocks of 5 by team colour, in this class
      order. Verified by eye: plumed helm, bowl helm, conical helm, tonsure,
-     long hair. */
+     long hair. Knights only — the Goblin faction ships no portraits. */
   var AVATAR_ORDER = ['Warrior', 'Pawn', 'Lancer', 'Monk', 'Archer'];
   var TEAM_AVATAR_BLOCK = { Blue: 0, Red: 5 };
   TS.avatarKey = function (team, cls) {
@@ -80,24 +113,37 @@
   function buildManifest() {
     var m = {};
 
-    TS.TEAMS.forEach(function (team) {
-      Object.keys(UNIT_SHEETS).forEach(function (cls) {
-        var anims = UNIT_SHEETS[cls];
-        Object.keys(anims).forEach(function (anim) {
-          m['u:' + team + ':' + cls + ':' + anim] =
-            UNIT_DIR + team + ' Units/' + anims[anim][0];
-        });
+    /* Player Knights, one file per animation (the pack's per-colour folders). */
+    Object.keys(UNIT_SHEETS).forEach(function (cls) {
+      var anims = UNIT_SHEETS[cls];
+      Object.keys(anims).forEach(function (anim) {
+        m['u:' + cls + ':' + anim] = UNIT_DIR + 'Blue Units/' + anims[anim][0];
       });
-      m['castle:' + team] = 'Buildings/' + team + ' Buildings/Castle.png';
     });
 
-    /* Arrow and Heal_Effect are byte-identical across teams — load once. */
+    /* Enemy Goblins, one grid sheet per class. */
+    Object.keys(GOBLIN_SHEETS).forEach(function (cls) {
+      m['g:' + cls] = GOBLIN_SHEETS[cls].file;
+    });
+    m['dynamite'] = 'Factions/Goblins/Troops/TNT/Dynamite/Dynamite.png';
+
+    /* Bases, each with the destroyed state the full pack provides. */
+    m['basePlayer'] = 'Factions/Knights/Buildings/Castle/Castle_Blue.png';
+    m['basePlayerWreck'] = 'Factions/Knights/Buildings/Castle/Castle_Destroyed.png';
+    m['baseEnemy'] = 'Factions/Goblins/Buildings/Wood_Tower/Wood_Tower_Red.png';
+    m['baseEnemyWreck'] = 'Factions/Goblins/Buildings/Wood_Tower/Wood_Tower_Destroyed.png';
+
     m['arrow'] = UNIT_DIR + 'Blue Units/Archer/Arrow.png';
     m['healFx'] = UNIT_DIR + 'Blue Units/Monk/Heal_Effect.png';
+    /* Shared death effect: a flash, then a skull that settles and sinks. Faction
+       neutral, so it serves knights and goblins alike. */
+    m['dead'] = 'Factions/Knights/Troops/Dead/Dead.png';
 
-    /* Terrain. color3 is the vivid field, color1 the olive plateau. */
-    m['tilesField'] = TER + 'Tileset/Tilemap_color3.png';
-    m['tilesLane'] = TER + 'Tileset/Tilemap_color1.png';
+    /* Ground. Tilemap_Flat carries a grass AND a sand 4x4 autotile side by side —
+       the sand is what makes the battle lane match the reference. */
+    m['ground'] = TER + 'Ground/Tilemap_Flat.png';
+    /* Terrain/Ground/Shadows.png is a grey rounded SQUARE — a building blob, not
+       a unit drop shadow. The Tileset folder's soft ellipse is the right one. */
     m['shadow'] = TER + 'Tileset/Shadow.png';
 
     /* Decor. */
@@ -113,12 +159,19 @@
     m['sheepIdle'] = TER + 'Resources/Meat/Sheep/Sheep_Idle.png';
     m['sheepGrass'] = TER + 'Resources/Meat/Sheep/Sheep_Grass.png';
 
-    /* Particle FX. */
+    /* Scatter props: mushrooms, pebbles, grass tufts, pumpkins and a bone —
+       the small details the reference dresses its field with. */
+    for (var d = 1; d <= 15; d++) {
+      var dd = (d < 10 ? '0' : '') + d;
+      m['deco' + dd] = 'Deco/' + dd + '.png';
+    }
+
+    /* Particle FX. Dust comes from the original Particle FX folder; the full
+       pack's Effects/ explosion and fire sheets are better than its Fire_0N. */
     m['dust1'] = FX + 'Dust_01.png';
     m['dust2'] = FX + 'Dust_02.png';
-    m['fire2'] = FX + 'Fire_02.png';
-    m['explosion1'] = FX + 'Explosion_01.png';
-    m['explosion2'] = FX + 'Explosion_02.png';
+    m['boom'] = 'Effects/Explosion/Explosions.png';
+    m['fire'] = 'Effects/Fire/Fire.png';
 
     /* UI kit. */
     m['btnBlue'] = UI + 'Buttons/BigBlueButton_Regular.png';
@@ -234,28 +287,43 @@
     var s = TS.sprite;
     var SPR = TS.SPR;
 
-    /* Units, keyed [team][class][anim]. */
+    /* Units, keyed [class][anim] — each class belongs to one faction. */
     SPR.unit = {};
-    TS.TEAMS.forEach(function (team) {
-      SPR.unit[team] = {};
-      Object.keys(UNIT_SHEETS).forEach(function (cls) {
-        var size = TS.unitFrameSize(cls);
-        var a = TS.unitAnchor(cls);
-        var out = {};
-        Object.keys(UNIT_SHEETS[cls]).forEach(function (anim) {
-          var img = images['u:' + team + ':' + cls + ':' + anim];
-          if (!img) return;
-          out[anim] = s(img, size, size, UNIT_SHEETS[cls][anim][1], a[0], a[1]);
-        });
-        SPR.unit[team][cls] = out;
+    Object.keys(UNIT_SHEETS).forEach(function (cls) {
+      var size = TS.unitFrameSize(cls);
+      var a = TS.unitAnchor(cls);
+      var out = {};
+      Object.keys(UNIT_SHEETS[cls]).forEach(function (anim) {
+        var img = images['u:' + cls + ':' + anim];
+        if (!img) return;
+        out[anim] = s(img, size, size, UNIT_SHEETS[cls][anim][1], a[0], a[1]);
       });
+      SPR.unit[cls] = out;
+    });
+    Object.keys(GOBLIN_SHEETS).forEach(function (cls) {
+      var img = images['g:' + cls];
+      if (!img) return;
+      var size = TS.unitFrameSize(cls);
+      var a = TS.unitAnchor(cls);
+      var anims = GOBLIN_SHEETS[cls].anims;
+      var out = {};
+      Object.keys(anims).forEach(function (anim) {
+        /* [row, count] — the row is what selects the animation in a grid sheet. */
+        out[anim] = s(img, size, size, anims[anim][1], a[0], a[1], anims[anim][0]);
+      });
+      SPR.unit[cls] = out;
     });
 
-    /* Shadow.png's bottom edge lines up with the 192px unit anchor exactly. */
+    /* Shadow.png's bottom edge lines up with the unit foot anchor exactly. */
     SPR.shadow = s(images['shadow'], 192, 192, 1, 96, 135);
 
     /* Heal_Effect overlays the healed unit, so it shares the unit anchor. */
     SPR.healFx = s(images['healFx'], 192, 192, 11, 96, 135);
+
+    /* 14 frames laid out 7 wide across two rows, hence the trailing `cols`. */
+    SPR.dead = s(images['dead'], 128, 128, 14, 64, 96, 0, 7);
+    /* Dynamite spins as it flies; anchored centre so rotation looks right. */
+    SPR.dynamite = s(images['dynamite'], 64, 64, 6, 32, 32);
     /* Arrow art spans x10-52, y26-37 and points right. Anchoring on the tip
        means the arrow's position IS its point, so impacts land where drawn. */
     SPR.arrow = s(images['arrow'], 64, 64, 1, 50, 32);
@@ -264,9 +332,9 @@
     SPR.fx = {
       dust1: s(images['dust1'], 64, 64, 8, 32, 40),
       dust2: s(images['dust2'], 64, 64, 10, 32, 40),
-      fire2: s(images['fire2'], 64, 64, 10, 32, 52),
-      explosion1: s(images['explosion1'], 192, 192, 8, 96, 110),
-      explosion2: s(images['explosion2'], 192, 192, 10, 96, 110)
+      /* Full-pack sheets: 9 explosion frames of 192, 7 fire frames of 128. */
+      boom: s(images['boom'], 192, 192, 9, 96, 118),
+      fire: s(images['fire'], 128, 128, 7, 64, 104)
     };
 
     /* Decor, anchored at the base so things sit on the ground. */
@@ -286,6 +354,14 @@
     }
     SPR.decor.sheepIdle = s(images['sheepIdle'], 128, 128, 6, 64, 108);
     SPR.decor.sheepGrass = s(images['sheepGrass'], 128, 128, 12, 64, 108);
+
+    /* Scatter props, base-anchored so they sit on the ground. */
+    SPR.decor.props = [];
+    for (var p = 1; p <= 15; p++) {
+      var pp = (p < 10 ? '0' : '') + p;
+      var pi = images['deco' + pp];
+      if (pi) SPR.decor.props.push(s(pi, 64, 64, 1, 32, 52));
+    }
   }
 
 })(window.TS);

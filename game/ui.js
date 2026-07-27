@@ -283,7 +283,7 @@
     UI.panel(ctx, 'paper', x, y, w, h);
 
     /* Animated idle art, so the bar feels alive rather than a static row. */
-    var spr = TS.SPR.unit.Blue[this.cls].idle;
+    var spr = TS.SPR.unit[this.cls].idle;
     var fps = this.def.fps.idle;
     TS.drawFrame(ctx, spr, (clock * fps) | 0, x + w / 2, y + h - 50,
       { scale: CARD_ART_SCALE[this.cls] || 1 });

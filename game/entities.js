@@ -85,6 +85,33 @@
       speed: 34, cooldown: 1.5, height: 96, guard: true,
       fps: { idle: 9, run: 10, attack: 9, guard: 11 }, hitFrame: 1,
       blurb: 'Slow, brutal, and strikes from behind the line.'
+    },
+
+    /* ---- Goblins: enemy only, never on a card ------------------------- */
+
+    /* The horde staple. Measured body 74px wide, hence contact 76. */
+    Torch: {
+      name: 'Torch Goblin', enemy: true,
+      hp: 105, dmg: 13, contact: 76, range: 124, speed: 54,
+      cooldown: 0.95, height: 88,
+      /* Damage lands as the flame arc sweeps across, on frame 3 of 6. */
+      fps: { idle: 8, run: 11, attack: 13 }, hitFrame: 3
+    },
+    /* Lobs dynamite that detonates in an area, so a tightly packed player line
+       takes the hit together. */
+    TNT: {
+      name: 'TNT Goblin', enemy: true,
+      hp: 85, dmg: 11, contact: 200, range: 250, speed: 44,
+      cooldown: 2.1, height: 88, ranged: true, aoe: 58,
+      fps: { idle: 8, run: 11, attack: 12 }, hitFrame: 5
+    },
+    /* A rolling keg: quick, fragile, and detonates on contact instead of
+       attacking. Kill it at range or it takes the front rank with it. */
+    Barrel: {
+      name: 'Barrel Bomb', enemy: true,
+      hp: 65, dmg: 32, contact: 48, range: 48, speed: 96,
+      cooldown: 99, height: 64, suicide: true, aoe: 70,
+      fps: { idle: 6, run: 13, attack: 14 }, hitFrame: 1
     }
   };
   TS.UNIT_DEFS = UNIT_DEFS;
@@ -98,17 +125,39 @@
   var CARD_CD = { Pawn: 1.7, Warrior: 2.2, Archer: 3.0, Monk: 5.0, Lancer: 7.0 };
   TS.cardCooldown = function (cls) { return CARD_CD[cls] || 1.5; };
 
-  /* ---------------------------------------------------------------- castle -- */
+  /* ------------------------------------------------------------------ base -- */
 
-  function Castle(team, isPlayer, hp) {
+  /* Per-faction base art. `ay` is the foot line inside the frame and artL/artR
+     are how far the visible art reaches either side of the anchor — measured,
+     because neither building fills its frame. The frame width would be wrong for
+     the gate test: the goblin tower's art is only 129px inside a 256px frame. */
+  var BASE_META = {
+    player: {
+      img: 'basePlayer', wreck: 'basePlayerWreck',
+      ax: 160, ay: 250, wreckAy: 253, artL: 156, artR: 155, frames: 1, fps: 1,
+      firePlume: 95, shadowR: 140
+    },
+    enemy: {
+      img: 'baseEnemy', wreck: 'baseEnemyWreck',
+      ax: 128, ay: 170, wreckAy: 173, artL: 65, artR: 64, frames: 4, fps: 6,
+      firePlume: 50, shadowR: 74
+    }
+  };
+
+  function Base(isPlayer, hp) {
     var LAY = TS.LAY;
-    this.team = team;
+    var meta = BASE_META[isPlayer ? 'player' : 'enemy'];
+    this.meta = meta;
     this.isPlayer = isPlayer;
     this.hp = this.maxHp = hp;
     this.x = isPlayer ? LAY.playerCastleX : LAY.enemyCastleX;
     this.y = LAY.castleBaseY;
     this.frontX = isPlayer ? LAY.playerFrontX : LAY.enemyFrontX;
-    this.img = TS.img('castle:' + team);
+    this.img = TS.img(meta.img);
+    this.wreckImg = TS.img(meta.wreck);
+    this.fw = this.img.width / meta.frames;
+    this.fh = this.img.height;
+    this.anim = 0;
     this.flash = 0;
     this.dead = false;
     this.shake = 0;
@@ -116,7 +165,12 @@
     this.barHp = hp;
   }
 
-  Castle.prototype.hurt = function (dmg) {
+  /* Outer edge of the VISIBLE art, used for gate occlusion. */
+  Base.prototype.artEdge = function () {
+    return this.isPlayer ? this.x + this.meta.artR : this.x - this.meta.artL;
+  };
+
+  Base.prototype.hurt = function (dmg) {
     if (this.dead) return;
     this.hp = Math.max(0, this.hp - dmg);
     this.flash = 1;
@@ -125,92 +179,118 @@
     if (this.hp <= 0) this.dead = true;
   };
 
-  Castle.prototype.update = function (dt) {
+  Base.prototype.update = function (dt) {
     this.flash = Math.max(0, this.flash - dt * 5);
     this.shake = Math.max(0, this.shake - dt * 22);
+    this.anim += this.meta.fps * dt;
     this.barHp = TS.approach(this.barHp, this.hp, Math.max(40, this.maxHp) * dt * 1.6);
-    /* Fire plumes once badly damaged. */
-    if (!this.dead && this.hp / this.maxHp < 0.35) {
+    /* Fire plumes once badly damaged, and on the wreck afterwards. */
+    var burning = this.dead || this.hp / this.maxHp < 0.35;
+    if (burning) {
       this.fireT = (this.fireT || 0) - dt;
       if (this.fireT <= 0) {
-        this.fireT = 0.16 + Math.random() * 0.2;
-        var fx = this.x + (Math.random() * 190 - 95);
-        TS.FX.burst(TS.SPR.fx.fire2, fx, this.y - 150 - Math.random() * 50, {
-          fps: 15, scale: 0.7 + Math.random() * 0.5, alpha: 0.85
-        });
+        this.fireT = 0.18 + Math.random() * 0.22;
+        var spread = this.meta.firePlume;
+        TS.FX.burst(TS.SPR.fx.fire, this.x + (Math.random() * 2 - 1) * spread,
+          this.y - (this.dead ? 10 : 90) - Math.random() * 50, {
+            fps: 14, scale: 0.6 + Math.random() * 0.5, alpha: 0.9
+          });
       }
     }
   };
 
-  Castle.prototype.draw = function (ctx) {
-    if (this.dead) return;
-    var img = this.img;
+  Base.prototype.draw = function (ctx) {
+    var meta = this.meta;
     var jx = this.shake ? (Math.random() * 2 - 1) * this.shake : 0;
-    var dx = Math.round(this.x - img.width / 2 + jx);
-    var dy = Math.round(this.y - img.height);
-    TS.blobShadow(ctx, this.x, this.y - 6, 140, 26, 0.2);
-    ctx.drawImage(img, dx, dy);
+    TS.blobShadow(ctx, this.x, this.y - 6, meta.shadowR, 24, 0.2);
+
+    if (this.dead) {
+      /* The full pack ships a rubble sprite for every building, so a fallen base
+         leaves a wreck instead of vanishing. */
+      var w = this.wreckImg;
+      if (!w) return;
+      ctx.drawImage(w, Math.round(this.x - meta.ax), Math.round(this.y - meta.wreckAy));
+      return;
+    }
+
+    var f = this.anim | 0;
+    var sx = (f % meta.frames) * this.fw;
+    var dx = Math.round(this.x - meta.ax + jx);
+    var dy = Math.round(this.y - meta.ay);
+    ctx.drawImage(this.img, sx, 0, this.fw, this.fh, dx, dy, this.fw, this.fh);
     if (this.flash > 0) {
       ctx.save();
       ctx.globalAlpha = this.flash * 0.55;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.drawImage(img, dx, dy);
+      ctx.drawImage(this.img, sx, 0, this.fw, this.fh, dx, dy, this.fw, this.fh);
       ctx.restore();
     }
   };
 
-  /* ----------------------------------------------------------------- arrow -- */
+  /* ------------------------------------------------------------ projectile -- */
 
-  function Arrow(team, x, y, target, dmg) {
-    this.team = team;
-    this.x = x;
-    this.y = y;
-    this.dmg = dmg;
-    this.target = target;
+  /* One ballistic projectile, used for both the Archer's arrow and the TNT
+     goblin's dynamite. `aoe` makes it detonate in a radius rather than striking
+     a single target; `spin` tumbles the sprite instead of pointing it along the
+     velocity, which is what dynamite should do. */
+  function Projectile(o) {
+    this.fromPlayer = o.fromPlayer;
+    this.x = o.x;
+    this.y = o.y;
+    this.dmg = o.dmg;
+    this.target = o.target;
+    this.spr = o.spr;
+    this.aoe = o.aoe || 0;
+    this.spin = !!o.spin;
+    this.speed = o.speed || ARROW_SPEED;
     this.dead = false;
+    this.anim = 0;
+    this.rot = 0;
 
-    var tx = target.x;
-    var ty = (target.feetY || target.y) - (target.def ? target.def.height * 0.55 : 90);
-    var dx = tx - x, dy = ty - y;
+    var t = o.target;
+    var tx = t.x;
+    var ty = (t.feetY || t.y) - (t.def ? t.def.height * 0.55 : 90);
+    var dx = tx - o.x, dy = ty - o.y;
     var dist = Math.max(40, Math.hypot(dx, dy));
-    this.T = dist / ARROW_SPEED;
+    this.T = dist / this.speed;
     this.t = 0;
-    /* Ballistic solve so the arrow arcs and its rotation always matches its
-       actual velocity. */
+    /* Ballistic solve, so the arc and the sprite's rotation always agree with
+       the actual velocity. */
     this.vx = dx / this.T;
     this.vy = dy / this.T - 0.5 * GRAVITY * this.T;
   }
 
-  Arrow.prototype.update = function (dt, battle) {
+  Projectile.prototype.update = function (dt, battle) {
     this.t += dt;
+    this.anim += 14 * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.vy += GRAVITY * dt;
-    this.rot = Math.atan2(this.vy, this.vx);
+    this.rot = this.spin ? this.anim * 0.9 : Math.atan2(this.vy, this.vx);
 
     if (this.t >= this.T) {
       this.dead = true;
-      var t = this.target;
-      if (t && !t.dead && t.hp > 0) {
-        t.hurt(this.dmg, this);
+      if (this.aoe) {
+        battle.detonate(this.x, this.y, this.aoe, this.dmg, this.fromPlayer, false);
       } else {
+        var t = this.target;
+        if (t && !t.dead && t.hp > 0) t.hurt(this.dmg, this);
         /* Target died mid-flight: the arrow simply lands. */
-        TS.FX.dust(this.x, this.y + 8, { scale: 0.5 });
+        else TS.FX.dust(this.x, this.y + 8, { scale: 0.5 });
       }
     }
     if (this.x < -60 || this.x > TS.W + 60 || this.y > TS.H) this.dead = true;
   };
 
-  Arrow.prototype.draw = function (ctx) {
-    TS.drawFrame(ctx, TS.SPR.arrow, 0, this.x, this.y, { rot: this.rot });
+  Projectile.prototype.draw = function (ctx) {
+    TS.drawFrame(ctx, this.spr, this.anim | 0, this.x, this.y, { rot: this.rot });
   };
 
   /* ------------------------------------------------------------------ unit -- */
 
-  function Unit(battle, team, cls, isPlayer, lane, buff) {
+  function Unit(battle, cls, isPlayer, lane, buff) {
     var LAY = TS.LAY;
     this.battle = battle;
-    this.team = team;
     this.cls = cls;
     this.def = UNIT_DEFS[cls];
     this.isPlayer = isPlayer;
@@ -224,7 +304,8 @@
     this.hp = this.maxHp;
     this.dmg = Math.round((this.def.dmg || 0) * mul);
 
-    this.spr = TS.SPR.unit[team][cls];
+    /* Sprites are keyed by class alone — each class belongs to one faction. */
+    this.spr = TS.SPR.unit[cls];
     this.state = 'spawn';
     this.stateT = 0;
     this.animT = 0;
@@ -298,7 +379,15 @@
     this.dead = true;
     this.state = 'die';
     this.dieT = 0;
-    TS.FX.poof(this.x, this.feetY);
+    /* The full pack ships a proper death effect — a flash, then a skull that
+       settles and sinks — so the sprite is removed at once and the effect stands
+       in for it. Earlier versions faded the idle frame out instead, because the
+       free pack had no death frames at all. A barrel bomb leaves no corpse. */
+    if (this.def.suicide) {
+      TS.FX.poof(this.x, this.feetY);
+    } else {
+      TS.FX.death(this.x, this.feetY);
+    }
     TS.Audio.play('die');
     if (this.isPlayer) this.battle.stats.lost++;
     else this.battle.stats.killed++;
@@ -387,15 +476,29 @@
       return;
     }
 
+    /* A suicide unit's "attack" is its own detonation. */
+    if (def.suicide) {
+      this.battle.detonate(this.x, this.feetY - 20, def.aoe, this.dmg,
+        this.isPlayer, true);
+      this.hp = 0;
+      this.die();
+      return;
+    }
+
     if (def.ranged) {
       var t = this.target;
       if (t && !t.dead) {
-        this.battle.arrows.push(new Arrow(
-          this.team,
-          this.x + this.dir * 22,
-          this.feetY - def.height * 0.62,
-          t, this.dmg
-        ));
+        this.battle.projectiles.push(new Projectile({
+          fromPlayer: this.isPlayer,
+          x: this.x + this.dir * 22,
+          y: this.feetY - def.height * 0.62,
+          target: t,
+          dmg: this.dmg,
+          spr: def.aoe ? TS.SPR.dynamite : TS.SPR.arrow,
+          aoe: def.aoe || 0,
+          spin: !!def.aoe,
+          speed: def.aoe ? 430 : ARROW_SPEED
+        }));
       }
       return;
     }
@@ -521,18 +624,9 @@
     var frame;
     var o = { flip: !this.isPlayer, flash: this.flash * 0.8 };
 
-    if (this.state === 'die') {
-      /* No death frames exist in the pack, so a unit collapses: fade, shrink,
-         and tip over slightly. */
-      var k = Math.min(1, this.dieT / 0.36);
-      o.alpha = 1 - k;
-      o.scale = 1 - k * 0.25;
-      o.rot = this.dir * k * 0.5;
-      o.flash = (1 - k) * 0.35;
-      frame = 0;
-      TS.drawFrame(ctx, this.spr.idle, frame, this.x, this.feetY, o);
-      return;
-    }
+    /* Dead units draw nothing: the Dead effect spawned in die() stands in for the
+       body, opening on a flash bright enough to cover the sprite disappearing. */
+    if (this.state === 'die') return;
 
     if (this.state === 'spawn') {
       /* Overshooting pop as the unit emerges. */
@@ -563,9 +657,9 @@
   function Battle(level) {
     this.level = level;
     this.units = [];
-    this.arrows = [];
-    this.playerCastle = new Castle('Blue', true, level.playerHp || 400);
-    this.enemyCastle = new Castle('Red', false, level.enemyHp || 400);
+    this.projectiles = [];
+    this.playerCastle = new Base(true, level.playerHp || 400);
+    this.enemyCastle = new Base(false, level.enemyHp || 400);
     this.gold = level.startGold == null ? 150 : level.startGold;
     this.goldCap = level.goldCap || 400;
     this.goldRate = level.goldRate || 12;
@@ -652,11 +746,30 @@
   };
 
   Battle.prototype.spawn = function (isPlayer, cls, buff) {
-    var team = isPlayer ? 'Blue' : 'Red';
-    var u = new Unit(this, team, cls, isPlayer, this.laneFor(isPlayer), buff);
+    var u = new Unit(this, cls, isPlayer, this.laneFor(isPlayer), buff);
     this.units.push(u);
     TS.FX.dust(u.x, u.feetY, { scale: 0.7 });
     return u;
+  };
+
+  /* Area damage: everything on the opposing side within `radius` of (x,y) takes
+     the full hit. Used by the TNT goblin's dynamite and the Barrel bomb, and it
+     can strike a base as well as units. */
+  Battle.prototype.detonate = function (x, y, radius, dmg, fromPlayer, big) {
+    var i;
+    for (i = 0; i < this.units.length; i++) {
+      var u = this.units[i];
+      if (u.dead || u.isPlayer === fromPlayer) continue;
+      /* Horizontal distance only: the three depth rows are a drawing device, not
+         real space, so a blast should catch a whole column of the front line. */
+      if (Math.abs(u.x - x) <= radius) u.hurt(dmg, null);
+    }
+    var base = fromPlayer ? this.enemyCastle : this.playerCastle;
+    if (!base.dead && Math.abs(base.frontX - x) <= radius) {
+      base.hurt(dmg);
+      TS.FX.number(x, y - 90, dmg, 'big');
+    }
+    TS.FX.explosion(x, y, !!big);
   };
 
   /* Player summon: checks affordability, per-card cooldown and the field cap. */
@@ -692,15 +805,17 @@
 
     for (i = 0; i < this.units.length; i++) this.units[i].update(dt);
     this.enforceSpacing();
-    for (i = 0; i < this.arrows.length; i++) this.arrows[i].update(dt, this);
+    for (i = 0; i < this.projectiles.length; i++) this.projectiles[i].update(dt, this);
 
     /* Reap: dying units linger for their fade, arrows vanish on impact. */
     for (i = this.units.length - 1; i >= 0; i--) {
       var u = this.units[i];
-      if (u.state === 'die' && u.dieT > 0.45) this.units.splice(i, 1);
+      /* The corpse effect is independent of the unit, so dead units can go almost
+         at once — one beat of grace keeps stat bookkeeping tidy. */
+      if (u.state === 'die' && u.dieT > 0.05) this.units.splice(i, 1);
     }
-    for (i = this.arrows.length - 1; i >= 0; i--) {
-      if (this.arrows[i].dead) this.arrows.splice(i, 1);
+    for (i = this.projectiles.length - 1; i >= 0; i--) {
+      if (this.projectiles[i].dead) this.projectiles.splice(i, 1);
     }
 
     if (!this.over) {
@@ -753,8 +868,12 @@
   Battle.prototype.draw = function (ctx) {
     var i;
     var pc = this.playerCastle, ec = this.enemyCastle;
-    var pGate = pc.x + pc.img.width / 2 + GATE_MARGIN;
-    var eGate = ec.x - ec.img.width / 2 - GATE_MARGIN;
+    /* Measured from the VISIBLE art, not the frame: the goblin tower fills only
+       129px of its 256px frame, and using the frame width here would mark units
+       as "behind the base" while standing in open ground — costing them their HP
+       bars for no reason. */
+    var pGate = pc.artEdge() + GATE_MARGIN;
+    var eGate = ec.artEdge() - GATE_MARGIN;
 
     /* Units still inside a castle's footprint draw BEHIND it, so they walk out
        from behind the wall instead of standing on top of the masonry. The
@@ -782,7 +901,7 @@
 
     drawGroup(ctx, field);
 
-    for (i = 0; i < this.arrows.length; i++) this.arrows[i].draw(ctx);
+    for (i = 0; i < this.projectiles.length; i++) this.projectiles[i].draw(ctx);
 
     TS.FX.drawFront(ctx);
     /* Only units clear of the gates get bars — a bar floating over a castle for
@@ -791,6 +910,6 @@
   };
 
   TS.Unit = Unit;
-  TS.Castle = Castle;
+  TS.Base = Base;
 
 })(window.TS);
