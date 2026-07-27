@@ -97,6 +97,21 @@ that way; it cannot affect reach or spacing. Real knockback happens in exactly o
 place, `Battle.detonate`, because a blast is rare and discrete. Per-swing knockback
 would make the front gap oscillate and drop the second rank in and out of range.
 
+**Impact feel is rendering, never time.** `punch`, `squash` and `holdT` join `push`
+as draw-only fields. Hit-stop is normally done by *freezing time*, which is not
+available here — the sim only advances in fixed 1/60 steps, so stalling it would make
+1x and 3x disagree about the outcome. Instead `holdT` holds the **drawn** frame for
+~3 frames while `animT` keeps advancing, so `applyHit` still fires on schedule and
+the attack's real duration is untouched. The squash is `scaleX`/`scaleY` at draw time
+only: rank spacing is measured off `def.body`, never off whatever the sprite is doing
+this frame. All three decay on the **sim** clock so the impact does not last three
+times as long at 3x. Verified draw-only by re-running the full sweep and reproducing
+all ten policy rows exactly.
+
+Note the sprite anchor sits at the **feet**, which is why a vertical stretch grows
+upward instead of sinking the unit into the sand. And `ctx.imageSmoothingEnabled` is
+false, so a fractional scale stays nearest-neighbour rather than blurring the art.
+
 **`file://` must keep working.** Hence classic `<script>` tags and a single global
 `TS` namespace — no ES modules. Keep it that way.
 
@@ -152,12 +167,20 @@ Barracks (`d.upg[cls] = Save.MAX_UPG`). A fresh save must reproduce the baseline
 exactly, since level 0 is a 1.00 multiplier — if it does not, something is reading
 upgrade state it should not.
 
-**Single runs near a win/lose boundary are not a signal.** The policies are crude and
-deterministic, so one unit dying a second earlier cascades through everything it
-could afford next. A sweep of TNT damage at 11 / 20 / 26 / 34 produced a
-*non-monotonic* result — 26 lost two battles that 34 won at full HP. Derive combat
-numbers from something structural (see the Monk-throughput argument on `TNT.dmg`) and
-use the sweep to confirm the shape, never to pick the value.
+**Single runs near a win/lose boundary are not a signal.** A sweep of TNT damage at
+11 / 20 / 26 / 34 produced a *non-monotonic* result — 26 lost two battles that 34 won
+at full HP. Derive combat numbers from something structural (see the Monk-throughput
+argument on `TNT.dmg`) and use the sweep to confirm the shape, never to pick the value.
+
+Two things drive that noise. The policies are crude, so one unit dying a second
+earlier cascades through everything it could afford next. **And the sim is not
+reproducible run to run:** `Math.random` is live in two sim paths — every unit's first
+swing is jittered by `atkTimer` (so a rank does not swing in lockstep) and `guard`
+classes have a 55% chance to play their block animation. Consequence: a *mid-battle*
+snapshot differs every run — the same battle sampled at t=40 gave enemy HP 118 then
+151 — while *final* outcomes are mostly robust, because they are usually not close.
+So compare completed battles, never intermediate state, and treat a one-battle swing
+at the boundary as noise rather than a result.
 
 ### Deploying
 

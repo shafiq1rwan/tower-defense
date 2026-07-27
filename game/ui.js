@@ -315,6 +315,8 @@
     this.pressed = false;
     this.flashT = 0;      // brief glow after a successful summon
     this.denyT = 0;       // shake after a failed tap
+    this.wasReady = false;
+    this.readyT = 0;      // one-shot ring the instant the card becomes playable
   }
   UI.Card = Card;
 
@@ -323,9 +325,12 @@
       py >= this.y && py <= this.y + this.h;
   };
 
+  var READY_POP = 0.45;
+
   Card.prototype.update = function (dt) {
     if (this.flashT > 0) this.flashT -= dt;
     if (this.denyT > 0) this.denyT -= dt;
+    if (this.readyT > 0) this.readyT -= dt;
   };
 
   /* The Lancer's 320px frame needs scaling down to fit a card; everyone else
@@ -339,6 +344,14 @@
     var affordable = battle.gold >= this.def.cost;
     var ready = cd <= 0 && affordable && !fieldFull;
     var w = this.w, h = this.h;
+
+    /* Fire a one-shot ring on the RISING EDGE of readiness. The steady rim below
+       says a card is playable; it does not catch the eye at the moment it becomes
+       playable, which is exactly when there is a decision to make. Detected here
+       because this is where `ready` is derived — the timer itself decays in
+       update() on the real-time UI clock, so it stays calm at 2x and 3x. */
+    if (ready && !this.wasReady) this.readyT = READY_POP;
+    this.wasReady = ready;
 
     var ox = 0, oy = this.pressed ? 4 : 0;
     if (this.denyT > 0) ox = Math.sin(this.denyT * 58) * this.denyT * 22;
@@ -409,6 +422,21 @@
       ctx.fillStyle = '#fff8e6';
       TS.roundRect(ctx, x, y, w, h, CARD_R);
       ctx.fill();
+      ctx.restore();
+    }
+
+    /* Ring expanding outward past the card's edge, so it reads even when five
+       cards sit shoulder to shoulder. Drawn outside the rounded clip above. */
+    if (this.readyT > 0) {
+      var k = 1 - this.readyT / READY_POP;
+      var grow = 15 * TS.easeOutCubic(k);
+      ctx.save();
+      ctx.globalAlpha = (1 - k) * 0.85;
+      ctx.strokeStyle = '#fff3c4';
+      ctx.lineWidth = 3.5;
+      TS.roundRect(ctx, x + 1.5 - grow, y + 1.5 - grow,
+        w - 3 + grow * 2, h - 3 + grow * 2, CARD_R - 1 + grow);
+      ctx.stroke();
       ctx.restore();
     }
   };

@@ -349,6 +349,11 @@
     this.swing = 0;
     this.flash = 0;
     this.push = 0;
+    /* Impact feel, all three DRAW-ONLY like `push` — see draw(). */
+    this.punch = 0;       // attacker leaning into its own blow
+    this.squash = 0;      // target compressing under one
+    this.holdT = 0;       // hit-stop: frames left holding the drawn frame
+    this.holdFrame = 0;
     this.dead = false;
     this.dieT = 0;
     this.target = null;
@@ -389,6 +394,9 @@
        reach or the tuned rank spacing. */
     var bite = TS.clamp(dmg / Math.max(1, this.maxHp), 0, 1);
     this.push = -this.dir * (5 + bite * 22);
+    /* The same bite curve drives a draw-only squash, so a heavy blow visibly
+       compresses the body while a chip hit barely registers. */
+    this.squash = 0.45 + 0.55 * bite;
     TS.Audio.play('hit');
 
     if (this.hp <= 0) {
@@ -585,6 +593,17 @@
     this.hitApplied = true;
     var def = this.def;
 
+    /* Hit-stop, for melee only — a bow release has no impact to sell. Proper
+       hit-stop freezes time, which is not available here: the sim advances in
+       fixed 1/60 steps and stalling it would make 1x and 3x disagree about the
+       outcome. Holding the DRAWN frame for ~3 frames reads the same way and the
+       simulation never knows it happened. */
+    if (!def.ranged && !def.healer && !def.suicide) {
+      this.punch = 1;
+      this.holdFrame = this.animT | 0;
+      this.holdT = 0.055;
+    }
+
     if (def.healer) {
       var ally = this.healTarget;
       if (ally && !ally.dead) ally.heal(this.healAmount);
@@ -649,6 +668,11 @@
     var rowY = LAY.lanes[this.lane];
     if (this.feetY !== rowY) this.feetY = TS.approach(this.feetY, rowY, 120 * dt);
     this.push = TS.approach(this.push, 0, 62 * dt);
+    /* Decayed on the SIM clock, like `push`, so the impact reads identically at
+       1x, 2x and 3x instead of lasting three times as long when sped up. */
+    if (this.punch > 0) this.punch = Math.max(0, this.punch - dt * 5.5);
+    if (this.squash > 0) this.squash = Math.max(0, this.squash - dt * 4.6);
+    if (this.holdT > 0) this.holdT = Math.max(0, this.holdT - dt);
     if (this.barShow > 0) this.barShow -= dt;
 
     if (this.state === 'die') {
@@ -795,6 +819,19 @@
     frame = this.animT | 0;
     if (this.state === 'attack' || this.state === 'guard') {
       frame = Math.min(spr.count - 1, frame);
+    }
+    /* Hit-stop. Rendering only: applyHit fires off animT, so damage timing and
+       the attack's real duration are untouched by the hold. */
+    if (this.holdT > 0) frame = this.holdFrame;
+
+    /* Squash and stretch. A side-on blow compresses the body along the lane and
+       bulges it upward; an attacker does the reverse as it commits to the swing.
+       Both are draw-only and must stay that way — the tuned rank spacing is
+       measured off `body`, not off whatever the sprite is doing this frame. */
+    if (this.punch > 0 || this.squash > 0) {
+      var p = this.punch * 0.11, q = this.squash * 0.13;
+      o.scaleX = (1 + p) * (1 - q);
+      o.scaleY = (1 - p * 0.55) * (1 + q * 0.7);
     }
     TS.drawFrame(ctx, spr, frame, this.x + this.push, this.feetY, o);
   };
