@@ -7,3 +7,10 @@
 *.aseprite
 
 node_modules/
+
+# itch.io upload, rebuilt any time with `node pack-itch.js`
+dist-itch/
+tiny-swords-lane-siege.zip
+
+# Store art, recaptured from the game rather than hand-made
+press/

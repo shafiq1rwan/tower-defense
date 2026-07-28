@@ -14,7 +14,7 @@
  * BUMP `VERSION` whenever anything in game/ changes, or returning visitors will
  * keep running the cached copy.
  */
-const VERSION = 'v27';
+const VERSION = 'v28';
 const SHELL = 'ts-shell-' + VERSION;
 const RUNTIME = 'ts-runtime-' + VERSION;
 const KEEP = [SHELL, RUNTIME];

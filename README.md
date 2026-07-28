@@ -66,6 +66,20 @@ and massing Archers behind a wall — the strongest-looking play, since they kil
 safety — is exactly what the TNT goblins are built to punish. The later battles want a
 screen, ranged damage *and* a healer keeping the back line alive.
 
+### Sound
+
+The pack ships **no audio at all**, so everything is synthesised with WebAudio.
+Twelve effects — sword swings, impacts, bowshots, deaths, healing, summons, coins,
+castle hits, UI clicks and the victory/defeat stings — plus a background score that
+takes its key and tempo from the level's theme, so the music turns minor and slower
+for the marsh and faster and darker for the storm.
+
+Browsers require a user gesture before any sound can start, so the first tap is what
+unlocks it. The speaker button on the title screen and in the pause menu toggles
+everything, and that choice is remembered between sessions. Music sits on its own
+mixer bus well under the effects, since the impacts are what carry the gameplay, and
+it keeps real time when you fast-forward rather than speeding up with the battle.
+
 ### Every battle is a different place
 
 The eight battles do not share a backdrop. Each has a **theme** (`game/themes.js`)
@@ -125,7 +139,7 @@ serve.js              local static file server
 game/
   gfx.js            sprite/anim, measured 9-slice + 3-slice, outlined text
   assets.js         manifest, loader, sprite registry
-  audio.js          procedural WebAudio SFX (the pack ships no audio)
+  audio.js          procedural WebAudio SFX and music (the pack ships no audio)
   save.js           localStorage progress
   themes.js         per-battle palette, weather, water and wildlife
   terrain.js        grass field + sand lane, pre-rendered once

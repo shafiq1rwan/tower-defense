@@ -120,6 +120,17 @@ sand always comes from `Tilemap_Flat` whatever the theme — the alternate tiles
 carry no sand at all. Weather and the day-tint draw in front of the units but inside
 the world transform, which is what keeps them off the HUD.
 
+**Audio must never draw from `Math.random` either, and music runs on the wall
+clock.** `Audio.play` is called from inside the sim (`applyHit`, `hurt`, `die`), so
+the same rule as scenery applies. `noise()` used to build its buffer per sound —
+5,280 `Math.random()` calls at 48kHz for one 0.11s impact, up to ~20 times a second
+— which meant *having sound on perturbed combat*. One buffer is now built at
+`unlock()` and replayed from a rotating offset chosen by a counter. Music is
+scheduled ahead on `ctx.currentTime` via `setInterval`, never from the frame loop or
+the sim: verified 2.50s per bar at both 1x and 3x, because battle music that
+accelerated with fast-forward would be unbearable. Beware measuring this by counting
+whole bars in a fixed window — phase alignment alone will show 4 bars or 5.
+
 **Scenery must never draw from `Math.random`.** `Scene.update` runs inside
 `simulate()`, so scenery sharing the global PRNG means weather perturbs combat: unit
 `atkTimer` jitter and the `guard` chance would land differently on a rainy level than

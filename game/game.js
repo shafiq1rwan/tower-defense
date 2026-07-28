@@ -202,6 +202,10 @@
   /* The menus share the battlefield as a backdrop, so after a stormy battle they
      would still be dark and raining. Put the calm theme back — but only when it is
      not already current, since this re-tiles the whole 832x1472 terrain canvas. */
+  /* Music belongs to battles. On the menus it would loop under a static screen for
+     as long as someone browses, which wears out a four-bar phrase fast. */
+  function stopMusic() { TS.Audio.Music.stop(); }
+
   function useDefaultBackdrop() {
     var theme = TS.defaultTheme();
     if (TS.Terrain.theme === theme) return;
@@ -214,6 +218,7 @@
     paused = false;
     confirmingReset = false;
     battle = null;
+    stopMusic();
     useDefaultBackdrop();
     buttons = [
       new TS.UI.Button({
@@ -273,6 +278,7 @@
 
   function goSelect() {
     screen = 'select';
+    stopMusic();
     useDefaultBackdrop();
     buttons = [];
     var n = TS.Levels.count;
@@ -426,6 +432,9 @@
     var theme = TS.themeFor(index);
     TS.Terrain.build(1000 + index * 37, theme);
     TS.Scene.build(1000 + index * 37, theme);
+    /* The score takes its key and tempo from the same theme, so the music darkens
+       with the weather rather than one track playing over all eight battles. */
+    TS.Audio.Music.play(theme.music);
 
     speed = 1;
     paused = false;
@@ -453,6 +462,9 @@
 
   function togglePause() {
     paused = !paused;
+    /* Suspend rather than stop, so resuming picks the phrase back up instead of
+       restarting the loop from bar one every time the player checks the menu. */
+    if (paused) TS.Audio.Music.suspend(); else TS.Audio.Music.resume();
     if (paused) {
       /* Two rows of two, kept above the banner's 111px rolled bottom edge. */
       buttons = [

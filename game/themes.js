@@ -69,6 +69,7 @@
   var THEMES = {
     meadow: {
       label: 'Green Meadow',
+      music: { root: 261.63, minor: false, bpm: 96 },
       ground: 'flat',
       clouds: 3, cloudAlpha: 1, cloudSpeed: 1,
       trees: 6, bushes: 12, sheep: 2, stumps: 2
@@ -76,6 +77,7 @@
 
     riverside: {
       label: 'Riverside',
+      music: { root: 246.94, minor: false, bpm: 88 },
       ground: 'lush',
       water: { y0: 286, y1: 512 },
       clouds: 3, cloudAlpha: 1, cloudSpeed: 1,
@@ -85,6 +87,7 @@
 
     highland: {
       label: 'Windy Highland',
+      music: { root: 293.66, minor: false, bpm: 104 },
       ground: 'mid',
       /* Wind: clouds race and leaves blow across. No rain — this is the "weather
          is doing something" step before the storms later on. */
@@ -95,6 +98,7 @@
 
     downpour: {
       label: 'Grey Downpour',
+      music: { root: 220.00, minor: true,  bpm: 82 },
       ground: 'dry',
       tint: { color: '#22384a', alpha: 0.26 },
       clouds: 5, cloudAlpha: 0.6, cloudSpeed: 1.6,
@@ -104,6 +108,7 @@
 
     marsh: {
       label: 'Still Marsh',
+      music: { root: 196.00, minor: true,  bpm: 70, pluck: false },
       ground: 'teal',
       water: { y0: 292, y1: 528 },
       tint: { color: '#20404a', alpha: 0.16 },
@@ -115,6 +120,7 @@
 
     dusk: {
       label: 'Last Light',
+      music: { root: 233.08, minor: false, bpm: 78 },
       ground: 'dry',
       /* Warm low sun, strongest at the horizon. 'overlay' rather than a flat wash —
          see Scene.drawFront for why a plain orange over green reads as mud. */
@@ -126,6 +132,7 @@
 
     storm: {
       label: 'Thunderhead',
+      music: { root: 174.61, minor: true,  bpm: 112 },
       ground: 'mid',
       tint: { color: '#141d33', alpha: 0.38 },
       clouds: 6, cloudAlpha: 0.45, cloudSpeed: 4.4,
@@ -135,6 +142,7 @@
 
     camp: {
       label: 'Goblin Camp',
+      music: { root: 164.81, minor: true,  bpm: 92 },
       ground: 'teal',
       /* Night, lit from the goblin side. Embers rise instead of anything falling,
          which is the one weather that moves UPWARD and so reads as heat. */
