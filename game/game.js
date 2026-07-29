@@ -505,7 +505,8 @@
     var level = TS.Levels.get(index);
     level.index = index;
 
-    TS.FX.reset();
+    /* Seeded from the level so a replay throws identical dust and coins. */
+    TS.FX.reset(1000 + index * 37);
     battle = new TS.Battle(level);
     /* Each battle gets its own THEME — palette, weather, water, how much life is
        about — plus a per-level seed so the scatter differs too. The seed alone was

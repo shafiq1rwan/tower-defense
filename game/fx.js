@@ -14,7 +14,17 @@
   var FX = {};
   TS.FX = FX;
 
-  FX.reset = function () {
+  /* FX.update, FX.number and FX.coin all run INSIDE simulate() — spawned from
+     hurt(), applyHit(), die() and bounty(). So effects sharing Math.random with the
+     simulation is the same coupling scenery and audio each had to be freed from: the
+     jitter on a damage number would draw from the same stream as a unit's first-swing
+     timing and the guard chance. Effects therefore get their own seeded generator and
+     never touch Math.random. Re-seeded per battle in FX.reset, so a replay throws its
+     dust and coins the same way. */
+  var frnd = TS.rng(0x2f6a91);
+
+  FX.reset = function (seed) {
+    frnd = TS.rng(((seed || 1337) * 2246822519) ^ 0x2f6a91);
     anims.length = 0;
     nums.length = 0;
     coins.length = 0;
@@ -94,12 +104,12 @@
   FX.number = function (x, y, text, kind) {
     var st = NUM_STYLE[kind] || NUM_STYLE.damage;
     nums.push({
-      x: x + (Math.random() * 18 - 9),
+      x: x + (frnd() * 18 - 9),
       y: y,
       /* `drift` biases the sideways travel — currency leans toward the purse rather
          than scattering either way like a damage number. */
-      vx: (st.drift || 0) + Math.random() * 22 - 11,
-      vy: (st.rise || -78) - Math.random() * 26,
+      vx: (st.drift || 0) + frnd() * 22 - 11,
+      vy: (st.rise || -78) - frnd() * 26,
       grav: st.grav == null ? 150 : st.grav,
       t: 0,
       life: st.life || 0.85,
@@ -126,9 +136,9 @@
     coins.push({
       x: x, y: y, amount: amount, tx: tx, ty: ty,
       /* Pops up and slightly toward the purse before gravity takes it. */
-      vx: -20 - Math.random() * 30,
-      vy: -150 - Math.random() * 60,
-      t: 0, spin: Math.random() * 6.28, flying: false, sx: 0, sy: 0
+      vx: -20 - frnd() * 30,
+      vy: -150 - frnd() * 60,
+      t: 0, spin: frnd() * 6.28, flying: false, sx: 0, sy: 0
     });
   };
 

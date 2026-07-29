@@ -144,12 +144,24 @@ the sim: verified 2.50s per bar at both 1x and 3x, because battle music that
 accelerated with fast-forward would be unbearable. Beware measuring this by counting
 whole bars in a fixed window — phase alignment alone will show 4 bars or 5.
 
-**Scenery must never draw from `Math.random`.** `Scene.update` runs inside
-`simulate()`, so scenery sharing the global PRNG means weather perturbs combat: unit
-`atkTimer` jitter and the `guard` chance would land differently on a rainy level than
-a clear one, and differently again if you changed the raindrop count. Scenery uses its
-own seeded `srnd`. Decoupling this shifted the sim's stream once — one already-won
-battle moved from 100% to 92% tower HP — but no win/loss changed.
+**Scenery, audio and effects must never draw from `Math.random`.** `Scene.update`,
+`FX.update`, `FX.number` and `FX.coin` all run inside `simulate()`, so sharing the
+global PRNG means presentation perturbs combat: unit `atkTimer` jitter and the `guard`
+chance would land differently on a rainy level than a clear one, and differently again
+if you changed the raindrop count or how many coins a kill drops. Each subsystem has
+its own seeded generator — `srnd` in scene.js, `frnd` in fx.js — re-seeded per battle
+so a replay throws identical dust, coins and weather. Decoupling scenery shifted the
+sim's stream once (one already-won battle moved 100% → 92% tower HP); decoupling FX
+changed no win or loss at all.
+
+**The root cause is still there, though: the SIM itself uses global `Math.random`.**
+Eight calls remain in entities.js — first-swing `atkTimer` jitter, the 55% `guard`
+chance, the burning-base fire, and `detonate`'s knockback scatter. While those read the
+global stream, *any* `Math.random()` anywhere in the process perturbs combat, so the
+rule above is a discipline rather than a guarantee. Giving the simulation its own
+seeded generator would make it airtight — and would remove the run-to-run sweep
+variance that makes single-battle results untrustworthy. Not done yet; it is the single
+highest-value cleanup left in the codebase.
 
 **Two more measured traps, in the water art.** `Foam.png` is 8 frames of 192px but
 the ring is only ~82px of ink (x55-136) inset in the middle of the cell, so spacing
