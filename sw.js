@@ -14,7 +14,7 @@
  * BUMP `VERSION` whenever anything in game/ changes, or returning visitors will
  * keep running the cached copy.
  */
-const VERSION = 'v28';
+const VERSION = 'v30';
 const SHELL = 'ts-shell-' + VERSION;
 const RUNTIME = 'ts-runtime-' + VERSION;
 const KEEP = [SHELL, RUNTIME];
@@ -36,6 +36,7 @@ const SHELL_FILES = [
   './game/fx.js',
   './game/entities.js',
   './game/levels.js',
+  './game/story.js',
   './game/ui.js',
   './game/game.js',
   './icons/icon-192.png',

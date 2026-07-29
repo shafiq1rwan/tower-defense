@@ -25,6 +25,19 @@ previous faction after it had been replaced.
 When testing in a throwaway browser profile, delete the profile between runs
 rather than trusting the bump.
 
+**This has now bitten twice.** The second time cost three debugging passes: `VERSION`
+was bumped once at the start of a feature, then the same file was edited several more
+times, and a reused browser profile kept serving the copy the worker had precached at
+the first bump. The symptom was maddening — a one-line colour fix was correct on
+disk, correct in the served response, and still wrong on screen. **Make the harness
+unregister service workers before the real page load**, every run, rather than relying
+on remembering to bump. And when a change is provably present in the file yet absent
+on screen, suspect the worker before you re-read your own logic.
+
+The fastest way to settle "is the running code what I think it is" is to sample the
+canvas: on `http://localhost` it is same-origin and **not** tainted, so
+`getImageData` works and a colour can be read back directly. Only `file://` taints it.
+
 ## Measure the art; never infer it
 
 Every single visual bug in this project came from assuming sheet geometry. The

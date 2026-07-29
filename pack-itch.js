@@ -169,7 +169,7 @@ const ART = [
 const CODE = [
   'game/style.css', 'game/gfx.js', 'game/assets.js', 'game/audio.js',
   'game/save.js', 'game/themes.js', 'game/terrain.js', 'game/scene.js',
-  'game/fx.js', 'game/entities.js', 'game/levels.js', 'game/ui.js',
+  'game/fx.js', 'game/entities.js', 'game/levels.js', 'game/story.js', 'game/ui.js',
   'game/game.js',
   'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png',

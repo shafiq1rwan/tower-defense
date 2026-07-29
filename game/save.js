@@ -15,6 +15,7 @@
     wins: 0,
     best: {},          // battleIndex -> best remaining castle HP %
     upg: {},           // class name -> upgrade level 0..MAX_UPG
+    story: {},         // cutscene key -> 1 once watched, so it never repeats
     muted: false
   };
 
@@ -46,6 +47,7 @@
     }
     if (typeof out.best !== 'object' || !out.best) out.best = {};
     if (typeof out.upg !== 'object' || !out.upg) out.upg = {};
+    if (typeof out.story !== 'object' || !out.story) out.story = {};
     return out;
   }
 

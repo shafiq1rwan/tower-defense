@@ -139,6 +139,10 @@
         p.pressed = false;
         pointer.target = null;
         if (still) activate(p);
+      } else if (screen === 'cutscene') {
+        /* Anywhere that is not the SKIP button advances the dialogue. Buttons are
+           hit-tested at pointerdown, so reaching here means empty space. */
+        TS.Story.advance();
       }
       if (e) e.preventDefault();
     }
@@ -152,6 +156,11 @@
     /* Keyboard shortcuts: 1-5 summon, space toggles speed, P pauses. */
     window.addEventListener('keydown', function (e) {
       TS.Audio.unlock();
+      if (screen === 'cutscene') {
+        if (e.code === 'Space' || e.key === 'Enter') { TS.Story.advance(); e.preventDefault(); }
+        else if (e.key === 'Escape') { TS.Story.skip(); e.preventDefault(); }
+        return;
+      }
       if (screen !== 'battle' || paused || !battle) {
         if (e.key === 'Escape' && paused) togglePause();
         return;
@@ -439,7 +448,6 @@
     speed = 1;
     paused = false;
     resultShown = false;
-    screen = 'battle';
 
     hud = {
       cards: TS.UI.layoutCards(level),
@@ -452,7 +460,32 @@
         x: 34, y: 145, kind: 'rndBlue', label: '1x', labelSize: 30, onTap: cycleSpeed
       })
     };
+
+    /* The battle is fully built — hud included — before its cutscene runs, which
+       is what lets the scene play over this level's own terrain, weather and
+       music. Nothing ticks while `screen` is 'cutscene': simulate() only runs on
+       'battle', so the battle waits at t=0 until the dialogue ends or is skipped. */
+    if (TS.Story.pending(index)) {
+      playCutscene(index, function () { enterBattle(); });
+      return;
+    }
+    enterBattle();
+  }
+
+  function enterBattle() {
+    screen = 'battle';
     buttons = [hud.pauseBtn, hud.speedBtn];
+  }
+
+  /* Shared by the pre-battle scenes and the epilogue. The only button is SKIP —
+     everything else advances on a tap anywhere, handled in the pointer release. */
+  function playCutscene(key, onDone) {
+    TS.Story.begin(key, onDone);
+    screen = 'cutscene';
+    buttons = [new TS.UI.Button({
+      x: 600, y: 1290, w: 184, h: 96, kind: 'big', label: 'SKIP', labelSize: 26,
+      onTap: function () { TS.Story.skip(); }
+    })];
   }
 
   function cycleSpeed() {
@@ -516,9 +549,15 @@
         onTap: function () { startBattle(battleIndex); }
       }));
     }
+    /* Winning the last battle earns the epilogue, played on the way back to the
+       map rather than on top of the result panel — the swords and the reward get
+       their moment first. */
+    var toMap = (won && !hasNext && TS.Story.pending('end'))
+      ? function () { resultShown = false; playCutscene('end', goSelect); }
+      : goSelect;
     buttons.push(new TS.UI.Button({
       x: 436, y: 862, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
-      onTap: goSelect
+      onTap: toMap
     }));
   }
 
@@ -538,7 +577,12 @@
       if (acc > STEP * 12) acc = 0;
     } else {
       acc = 0;
-      if (screen === 'title' || screen === 'select') TS.Scene.update(dt);
+      /* Scenery keeps moving behind a cutscene — the weather is half the point of
+         setting the scene in the level it belongs to. Real dt, like the menus. */
+      if (screen === 'title' || screen === 'select' || screen === 'cutscene') {
+        TS.Scene.update(dt);
+      }
+      if (screen === 'cutscene') TS.Story.update(dt);
     }
 
     if (hud) {
@@ -591,7 +635,11 @@
     TS.Scene.drawFront(ctx);
     ctx.restore();
 
-    if (screen === 'battle') {
+    if (screen === 'cutscene') {
+      /* The SKIP button is drawn by the shared loop below, so it lands on top of
+         the dim overlay and the dialogue box. */
+      TS.Story.draw(ctx, uiClock);
+    } else if (screen === 'battle') {
       TS.UI.drawBattleHud(ctx, battle, hud, uiClock);
       if (paused) drawPause();
       else if (resultShown) drawResult();
