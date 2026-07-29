@@ -34,7 +34,18 @@
     var raw = null;
     try { raw = window.localStorage.getItem(KEY); } catch (e) { raw = null; }
     var out = {};
-    for (var k in DEFAULTS) out[k] = DEFAULTS[k];
+    /* Object-valued defaults must be COPIED, not aliased. `out[k] = DEFAULTS[k]`
+       handed out the very same `best` / `upg` / `story` objects every time, so the
+       first write mutated DEFAULTS itself and every later "fresh" save was born
+       carrying it. In practice that meant Reset Progress did not clear upgrades,
+       star ratings or watched cutscenes until the page was reloaded — and it made
+       a repeated balance sweep report a fresh save as fully upgraded, which is how
+       it surfaced. Every object default here is an empty map, so {} is the right
+       fresh value. */
+    for (var k in DEFAULTS) {
+      var dv = DEFAULTS[k];
+      out[k] = (dv && typeof dv === 'object') ? {} : dv;
+    }
     if (raw) {
       try {
         var parsed = JSON.parse(raw);

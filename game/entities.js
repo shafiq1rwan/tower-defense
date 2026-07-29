@@ -439,8 +439,12 @@
       TS.FX.death(this.x, this.feetY);
     }
     TS.Audio.play('die');
-    if (this.isPlayer) this.battle.stats.lost++;
-    else this.battle.stats.killed++;
+    if (this.isPlayer) {
+      this.battle.stats.lost++;
+    } else {
+      this.battle.stats.killed++;
+      this.battle.bounty(this);
+    }
   };
 
   /* Nearest enemy within reach, by absolute X distance. Absolute rather than
@@ -856,7 +860,8 @@
     this.enemyCastle = new Base(false, level.enemyHp || 400);
     this.gold = level.startGold == null ? 150 : level.startGold;
     this.goldCap = level.goldCap || 400;
-    this.goldRate = level.goldRate || 12;
+    /* Scaled down because kills now supply the rest — see BOUNTY. */
+    this.goldRate = (level.goldRate || 12) * GOLD_RATE_MUL;
     this.time = 0;
     /* Every battle is on a clock, as in the reference. Without it a player who
        only trickles cheap units can hold a line forever and the battle never
@@ -866,7 +871,10 @@
     this.over = null;         // 'win' | 'lose'
     this.overT = 0;
     this.byTimeout = false;
-    this.stats = { killed: 0, lost: 0, spent: 0 };
+    this.stats = { killed: 0, lost: 0, spent: 0, earned: 0 };
+    /* Draw-only, decayed on the SIM clock like unit.push so it reads the same at
+       1x and 3x: brief flare on the purse when a bounty lands. */
+    this.goldPulse = 0;
     /* Round-robin fallback so spawns spread across rows even when counts tie. */
     this.nextLane = 0;
     this.cooldowns = {};
@@ -981,6 +989,48 @@
     TS.FX.explosion(x, y, !!big);
   };
 
+  /* Gold for a kill. Income used to be a pure timer, which meant a flawless
+     defence and a sloppy one banked exactly the same — nothing you did with the
+     units you bought fed back into buying more.
+     Values are proportional to what each goblin costs you to remove, not to its
+     nuisance: the TNT is the highest bounty because reaching the artillery behind
+     the screen is the hardest thing the player is asked to do. Rounded to whole
+     gold so the HUD never shows a fraction.
+
+     Deliberately NOT a `Math.random` roll. die() runs inside the simulation, so a
+     random bounty would draw from the same PRNG as attack jitter — the coupling
+     that scenery and audio both had to be freed from.
+
+     Sizing is a TRADE, not free money: the timer rate is cut by GOLD_RATE_MUL by
+     roughly as much as bounties are expected to add, so total income per battle
+     stays close to the tuned figure and only its SOURCE changes. These values put
+     kills at 10% of campaign income, measured; the timer supplies the rest.
+
+     Getting the size wrong is not cosmetic, because a kill-funded economy
+     COMPOUNDS: killing faster buys more units, which kill faster still. Measured
+     at Torch 15 / TNT 28 / Barrel 10, kills reached 17% of income and battle 8
+     started falling on a FRESH save — 2 wins in 15, at full tower HP, where it had
+     never fallen without upgrades before. Battle 8 is the campaign's only
+     difficulty ceiling, so that is a regression, not a nicety.
+
+     The fix was to damp the TORCH specifically rather than the timer. Torches are
+     around 60% of all spawns, so they are the snowball's fuel, while the TNT stays
+     the biggest single bounty because reaching the artillery behind the screen is
+     the hardest thing the player is asked to do. At these values battle 8 is back
+     to 0 wins in 8 fresh attempts. Re-sweep after ANY change here. */
+  var BOUNTY = { Torch: 7, TNT: 20, Barrel: 7 };
+  var GOLD_RATE_MUL = 0.90;
+
+  Battle.prototype.bounty = function (unit) {
+    var amount = BOUNTY[unit.cls] || 0;
+    if (!amount) return;
+    this.gold = Math.min(this.goldCap, this.gold + amount);
+    this.stats.earned = (this.stats.earned || 0) + amount;
+    /* Reads at the kill, where the player is already looking. */
+    TS.FX.number(unit.x, unit.feetY - unit.def.height - 4, '+' + amount, 'gold');
+    this.goldPulse = 1;
+  };
+
   /* Player summon: checks affordability, per-card cooldown and the field cap. */
   Battle.prototype.trySummon = function (cls) {
     var def = UNIT_DEFS[cls];
@@ -1003,6 +1053,7 @@
 
     if (!this.over) {
       this.gold = Math.min(this.goldCap, this.gold + this.goldRate * dt);
+      if (this.goldPulse > 0) this.goldPulse = Math.max(0, this.goldPulse - dt * 3.2);
       for (var c in this.cooldowns) {
         if (this.cooldowns[c] > 0) this.cooldowns[c] = Math.max(0, this.cooldowns[c] - dt);
       }

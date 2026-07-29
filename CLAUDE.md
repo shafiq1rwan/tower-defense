@@ -214,6 +214,24 @@ Barracks (`d.upg[cls] = Save.MAX_UPG`). A fresh save must reproduce the baseline
 exactly, since level 0 is a 1.00 multiplier — if it does not, something is reading
 upgrade state it should not.
 
+**A kill-funded economy compounds — re-sweep it, always.** Income is part timer
+(`goldRate * GOLD_RATE_MUL`) and part bounty (`BOUNTY` per goblin killed), currently
+about 90/10. Bounties are not free money: the timer was cut by roughly what they add,
+so only the *source* of income changed. But bounties scale with kills, kills scale
+with battle length, and more gold buys more units that kill faster still. Measured:
+raising bounties until kills were 17% of income made battle 8 fall on a **fresh save**
+2 times in 15 at full tower HP, having never fallen without upgrades. The fix was to
+damp the **Torch** bounty specifically — Torches are ~60% of spawns, so they are the
+snowball's fuel — while leaving TNT the biggest single bounty, since reaching the
+artillery is the hardest thing the player is asked to do.
+
+**`read()` must COPY the object defaults.** `out[k] = DEFAULTS[k]` aliased `best`,
+`upg` and `story`, so the first write mutated `DEFAULTS` itself and every later fresh
+save inherited it. Reset Progress silently failed to clear upgrades, stars or watched
+cutscenes until the page reloaded, and a repeated balance sweep reported a fresh save
+as fully upgraded — which is how it was caught. Any new object-valued default needs
+the same treatment.
+
 **Single runs near a win/lose boundary are not a signal.** A sweep of TNT damage at
 11 / 20 / 26 / 34 produced a *non-monotonic* result — 26 lost two battles that 34 won
 at full HP. Derive combat numbers from something structural (see the Monk-throughput

@@ -27,7 +27,7 @@
   var hud = null;          // battle-screen widgets
   var titleUnits = [];
   var titleBases = [];
-  var confirmingReset = false;
+  var confirming = null;      // shared confirmation dialog, or null
 
   /* Result-screen award animation. Driven by real time, not sim time, so the
      swords land at the same pace whatever speed the battle was running at. */
@@ -284,7 +284,7 @@
   function goTitle() {
     screen = 'title';
     paused = false;
-    confirmingReset = false;
+    confirming = null;
     battle = null;
     stopMusic();
     useDefaultBackdrop();
@@ -306,41 +306,55 @@
     ];
   }
 
-  function askResetConfirm() {
-    confirmingReset = true;
+  /* One confirmation dialog, shared. It draws over whatever screen is beneath it,
+     which is what lets the same code guard both wiping the save from the title and
+     abandoning a battle from the pause menu. */
+  function askConfirm(o) {
+    confirming = o;
     buttons = [
       new TS.UI.Button({
-        x: 130, y: 806, w: 260, h: 126, kind: 'bigRed', label: 'RESET', labelSize: 32,
-        onTap: function () {
-          TS.Save.reset();
-          TS.Save.get();
-          goTitle();
-        }
+        x: 130, y: 806, w: 260, h: 126, kind: 'bigRed',
+        label: o.okLabel || 'YES', labelSize: 32,
+        onTap: function () { var f = o.onOk; confirming = null; if (f) f(); }
       }),
       new TS.UI.Button({
         x: 442, y: 806, w: 260, h: 126, kind: 'big', label: 'CANCEL', labelSize: 30,
-        onTap: goTitle
+        onTap: function () { var f = o.onCancel; confirming = null; if (f) f(); }
       })
     ];
   }
 
-  function drawResetConfirm() {
-    var save = TS.Save.get();
+  function drawConfirm() {
+    var c = confirming;
     var d = TS.UI.dialog(ctx, {
-      w: 620, h: 480, y: 470, title: 'ARE YOU SURE?', titleRow: TS.UI.PLATE.red
+      w: 620, h: 480, y: 470, title: c.title, titleRow: TS.UI.PLATE.red
     });
-    TS.text(ctx, 'This erases all progress:', TS.W / 2, d.y + 116, {
-      size: 26, fill: '#5c4632', stroke: null
-    });
-    TS.text(ctx, save.cleared + ' of ' + TS.Levels.count + ' battles cleared',
-      TS.W / 2, d.y + 166, { size: 24, fill: '#7a6248', stroke: null });
+    var y = d.y + 116;
+    for (var i = 0; i < c.lines.length; i++) {
+      var ln = c.lines[i];
+      TS.text(ctx, ln.text, TS.W / 2, y, {
+        size: ln.size || 24, fill: ln.fill || '#7a6248', stroke: null
+      });
+      y += (ln.size || 24) + 26;
+    }
+  }
+
+  function askResetConfirm() {
+    var save = TS.Save.get();
     var levels = TS.CLASSES.reduce(function (n, c) {
       return n + TS.Save.upgradeLevel(c);
     }, 0);
-    TS.text(ctx, save.gold + ' gold and ' + levels + ' upgrades',
-      TS.W / 2, d.y + 206, { size: 24, fill: '#7a6248', stroke: null });
-    TS.text(ctx, 'It cannot be undone.', TS.W / 2, d.y + 262, {
-      size: 22, fill: '#9a7a5a', stroke: null
+    askConfirm({
+      title: 'ARE YOU SURE?',
+      lines: [
+        { text: 'This erases all progress:', size: 26, fill: '#5c4632' },
+        { text: save.cleared + ' of ' + TS.Levels.count + ' battles cleared' },
+        { text: save.gold + ' gold and ' + levels + ' upgrades' },
+        { text: 'It cannot be undone.', size: 22, fill: '#9a7a5a' }
+      ],
+      okLabel: 'RESET',
+      onOk: function () { TS.Save.reset(); TS.Save.get(); goTitle(); },
+      onCancel: goTitle
     });
   }
 
@@ -552,34 +566,55 @@
     hud.speedBtn.label = speed + 'x';
   }
 
+  /* Extracted so the quit confirmation can put the pause menu back on Cancel. */
+  function pauseButtons() {
+    /* Two rows of two, kept above the banner's 111px rolled bottom edge. */
+    return [
+      new TS.UI.Button({
+        x: 150, y: 620, w: 250, h: 120, kind: 'big', label: 'RESUME', labelSize: 28,
+        onTap: togglePause
+      }),
+      new TS.UI.Button({
+        x: 432, y: 620, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 28,
+        onTap: function () { startBattle(battleIndex); }
+      }),
+      new TS.UI.Button({
+        x: 150, y: 756, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 28,
+        onTap: askQuitConfirm
+      }),
+      new TS.UI.Button({
+        x: 432, y: 756, w: 250, h: 120, kind: 'big',
+        icon: 'icon12', onTap: function () { TS.Audio.toggle(); }
+      })
+    ];
+  }
+
   function togglePause() {
     paused = !paused;
     /* Suspend rather than stop, so resuming picks the phrase back up instead of
        restarting the loop from bar one every time the player checks the menu. */
     if (paused) TS.Audio.Music.suspend(); else TS.Audio.Music.resume();
-    if (paused) {
-      /* Two rows of two, kept above the banner's 111px rolled bottom edge. */
-      buttons = [
-        new TS.UI.Button({
-          x: 150, y: 620, w: 250, h: 120, kind: 'big', label: 'RESUME', labelSize: 28,
-          onTap: togglePause
-        }),
-        new TS.UI.Button({
-          x: 432, y: 620, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 28,
-          onTap: function () { startBattle(battleIndex); }
-        }),
-        new TS.UI.Button({
-          x: 150, y: 756, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 28,
-          onTap: goSelect
-        }),
-        new TS.UI.Button({
-          x: 432, y: 756, w: 250, h: 120, kind: 'big',
-          icon: 'icon12', onTap: function () { TS.Audio.toggle(); }
-        })
-      ];
-    } else {
-      buttons = [hud.pauseBtn, hud.speedBtn];
-    }
+    confirming = null;
+    buttons = paused ? pauseButtons() : [hud.pauseBtn, hud.speedBtn];
+  }
+
+  /* Leaving mid-battle used to be a single unguarded tap on MAP, which threw away
+     a run in progress with no way back — easy to hit by accident reaching for
+     RESUME right above it. */
+  function askQuitConfirm() {
+    var pct = Math.round(100 * battle.playerCastle.hp / battle.playerCastle.maxHp);
+    askConfirm({
+      title: 'LEAVE THE BATTLE?',
+      lines: [
+        { text: 'This battle will not be saved.', size: 26, fill: '#5c4632' },
+        { text: 'Tower at ' + pct + '% · ' + battle.stats.killed + ' felled',
+          size: 24, fill: '#7a6248' },
+        { text: 'You can replay it from the map.', size: 22, fill: '#9a7a5a' }
+      ],
+      okLabel: 'LEAVE',
+      onOk: goSelect,
+      onCancel: function () { buttons = pauseButtons(); }
+    });
   }
 
   function showResult() {
@@ -711,16 +746,20 @@
       TS.Story.draw(ctx, uiClock);
     } else if (screen === 'battle') {
       TS.UI.drawBattleHud(ctx, battle, hud, uiClock);
-      if (paused) drawPause();
+      /* The confirmation replaces the pause panel rather than stacking on it —
+         two overlapping dialogs read as a rendering fault. */
+      if (paused) { if (!confirming) drawPause(); }
       else if (resultShown) drawResult();
     } else if (screen === 'title') {
       drawTitle();
-      if (confirmingReset) drawResetConfirm();
     } else if (screen === 'select') {
       drawSelect();
     } else if (screen === 'shop') {
       drawShop();
     }
+
+    /* Over the screen beneath, under the buttons drawn next. */
+    if (confirming) drawConfirm();
 
     for (var i = 0; i < buttons.length; i++) {
       if (buttons[i].kind !== 'none') buttons[i].draw(ctx);
