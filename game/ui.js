@@ -285,6 +285,10 @@
      its recessed track. The pack's own BigBar_Fill is crimson — a health-bar
      fill — so gold is drawn rather than sliced. The frame's art band is 51px
      tall and the recess sits between its inner rules at offsets 12 and 35. */
+  /* The purse coin in the bottom panel — where bounty coins fly to. Kept beside the
+     code that draws it so the two cannot drift apart. */
+  UI.PURSE = { x: 54, y: 1236 };
+
   UI.goldBar = function (ctx, x, y, w, frac) {
     TS.threeSlice(ctx, TS.img('barBig'), TS.THREE.barBig, x, y, w);
 
@@ -479,7 +483,9 @@
     /* Bar art is 51px tall, so it occupies 1204-1255, leaving a clear band at
        1272 for the status line above the cards at 1284. */
     UI.goldBar(ctx, 96, 1204, 690, battle.gold / battle.goldCap);
-    UI.icon(ctx, 'icon03', 54, 1236, 0.86);
+    /* Flares as a bounty coin lands. */
+    var pf = TS.FX.purseFlash;
+    UI.icon(ctx, 'icon03', UI.PURSE.x, UI.PURSE.y, 0.86 + 0.22 * pf);
     /* Sized and placed to sit INSIDE the bar's recessed channel, not on its frame.
        The BigBar art is 51px tall but the fill track is only 23 of that, starting
        12px down — so a size-28 label centred on 1237 was both taller than the

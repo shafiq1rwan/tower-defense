@@ -17,6 +17,8 @@
   FX.reset = function () {
     anims.length = 0;
     nums.length = 0;
+    coins.length = 0;
+    FX.purseFlash = 0;
     shakeAmp = 0;
     shakeT = 0;
   };
@@ -75,11 +77,18 @@
     FX.burst(TS.SPR.healFx, x, y, { fps: 18, alpha: 0.95 });
   };
 
+  /* Bounty text used to be #ffd257 at size 26 — the same gold as `big` castle-damage
+     numbers, within a pixel of ordinary `damage`, rising from the same spot with the
+     same arc. It read as another damage number because nothing about it said "money".
+     Floating text was the wrong tool: it is now an actual COIN that drops off the
+     kill and flies to the purse (see FX.coin), and `gold` is only the small "+N" that
+     pops at the purse when the coin lands. Flat rise and short life, because by then
+     the coin has already told the story. */
   var NUM_STYLE = {
     damage: { fill: '#fff3d6', stroke: '#5a2b1c', size: 27 },
     big: { fill: '#ffd257', stroke: '#5a2b1c', size: 34 },
     heal: { fill: '#a8ec8a', stroke: '#1f4a22', size: 26 },
-    gold: { fill: '#ffd257', stroke: '#5a3a12', size: 26 }
+    gold: { fill: '#ffe487', stroke: '#5a3a12', size: 22, rise: -30, grav: 30, life: 0.8 }
   };
 
   FX.number = function (x, y, text, kind) {
@@ -87,14 +96,86 @@
     nums.push({
       x: x + (Math.random() * 18 - 9),
       y: y,
-      vx: Math.random() * 22 - 11,
-      vy: -78 - Math.random() * 26,
+      /* `drift` biases the sideways travel — currency leans toward the purse rather
+         than scattering either way like a damage number. */
+      vx: (st.drift || 0) + Math.random() * 22 - 11,
+      vy: (st.rise || -78) - Math.random() * 26,
+      grav: st.grav == null ? 150 : st.grav,
       t: 0,
-      life: 0.85,
+      life: st.life || 0.85,
       text: text,
       st: st,
       pop: 0
     });
+  };
+
+  /* ------------------------------------------------------------- coins -- */
+
+  /* A bounty is a coin, not a caption: it pops off the corpse, falls, then flies to
+     the purse and pops a small "+N" on arrival. Two reasons that beats text —
+     it cannot be mistaken for damage, and it shows you WHERE the gold went.
+     The gold itself is credited immediately by Battle.bounty; this is pure
+     feedback, so a coin still in flight never means gold you cannot spend yet. */
+  var coins = [];
+  FX.purseFlash = 0;
+
+  var DROP = 0.30;   // seconds falling off the kill
+  var FLY = 0.42;    // seconds travelling to the purse
+
+  FX.coin = function (x, y, amount, tx, ty) {
+    coins.push({
+      x: x, y: y, amount: amount, tx: tx, ty: ty,
+      /* Pops up and slightly toward the purse before gravity takes it. */
+      vx: -20 - Math.random() * 30,
+      vy: -150 - Math.random() * 60,
+      t: 0, spin: Math.random() * 6.28, flying: false, sx: 0, sy: 0
+    });
+  };
+
+  function updateCoins(dt) {
+    if (FX.purseFlash > 0) FX.purseFlash = Math.max(0, FX.purseFlash - dt * 3.4);
+    for (var i = coins.length - 1; i >= 0; i--) {
+      var c = coins[i];
+      c.t += dt;
+      c.spin += 9 * dt;
+      if (!c.flying) {
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.vy += 620 * dt;
+        if (c.t >= DROP) {
+          /* Remember where the fall ended; the flight interpolates from there so
+             there is no visible jump between the two phases. */
+          c.flying = true;
+          c.sx = c.x; c.sy = c.y; c.t = 0;
+        }
+        continue;
+      }
+      var k = Math.min(1, c.t / FLY);
+      var e = TS.easeOutCubic(k);
+      c.x = c.sx + (c.tx - c.sx) * e;
+      /* Arcs rather than sliding: lifts above the straight line, most at mid-flight. */
+      c.y = c.sy + (c.ty - c.sy) * e - Math.sin(k * Math.PI) * 90;
+      if (k >= 1) {
+        FX.number(c.tx, c.ty - 30, '+' + c.amount, 'gold');
+        FX.purseFlash = 1;
+        TS.Audio.play('coin');
+        coins.splice(i, 1);
+      }
+    }
+  }
+
+  /* Drawn AFTER the HUD, unlike every other effect — the purse sits inside the wood
+     panel, so a coin on the normal FX layer would slide under it and vanish exactly
+     as it arrived. */
+  FX.drawCoins = function (ctx) {
+    for (var i = 0; i < coins.length; i++) {
+      var c = coins[i];
+      /* Shrinks slightly as it lands, which reads as dropping into the purse. */
+      var k = c.flying ? Math.min(1, c.t / FLY) : 0;
+      TS.drawFrame(ctx, TS.SPR.fxCoin, 0, c.x, c.y, {
+        scale: 0.5 - 0.16 * k, rot: c.spin
+      });
+    }
   };
 
   FX.shake = function (amount) {
@@ -115,10 +196,12 @@
       n.t += dt;
       n.x += n.vx * dt;
       n.y += n.vy * dt;
-      n.vy += 150 * dt;   // gentle arc
+      n.vy += n.grav * dt;   // gentle arc; currency uses a much flatter one
       n.pop = Math.min(1, n.t / 0.12);
       if (n.t >= n.life) nums.splice(i, 1);
     }
+    updateCoins(dt);
+
     if (shakeAmp > 0) {
       shakeT += dt;
       shakeAmp -= shakeAmp * 9 * dt + 12 * dt;

@@ -1072,8 +1072,10 @@
     if (!amount) return;
     this.gold = Math.min(this.goldCap, this.gold + amount);
     this.stats.earned = (this.stats.earned || 0) + amount;
-    /* Reads at the kill, where the player is already looking. */
-    TS.FX.number(unit.x, unit.feetY - unit.def.height - 4, '+' + amount, 'gold');
+    /* An actual coin off the corpse, flying to the purse — see FX.coin. Text over
+       the kill was the problem: that airspace belongs to damage numbers. */
+    var purse = TS.UI.PURSE;
+    TS.FX.coin(unit.x, unit.feetY - 30, amount, purse.x, purse.y);
     this.goldPulse = 1;
   };
 

@@ -394,6 +394,9 @@
        means the arrow's position IS its point, so impacts land where drawn. */
     SPR.arrow = s(images['arrow'], 64, 64, 1, 50, 32);
     SPR.arrowFoe = s(images['arrowFoe'], 64, 64, 1, 50, 32);
+    /* The bounty coin. Anchored on Icon_03's measured ink centre (31,30) rather than
+       the frame centre, so it spins about itself instead of wobbling. */
+    SPR.fxCoin = s(images['icon03'], 64, 64, 1, 31, 30);
 
     /* FX are centre-anchored. */
     SPR.fx = {

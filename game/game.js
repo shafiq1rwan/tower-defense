@@ -746,6 +746,8 @@
       TS.Story.draw(ctx, uiClock);
     } else if (screen === 'battle') {
       TS.UI.drawBattleHud(ctx, battle, hud, uiClock);
+      /* Above the HUD: the purse it flies into is inside the wood panel. */
+      TS.FX.drawCoins(ctx);
       /* The confirmation replaces the pause panel rather than stacking on it —
          two overlapping dialogs read as a rendering fault. */
       if (paused) { if (!confirming) drawPause(); }
