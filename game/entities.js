@@ -130,6 +130,48 @@
       cooldown: 2.1, height: 88, ranged: true, aoe: 58, lob: 440,
       fps: { idle: 8, run: 11, attack: 12 }, hitFrame: 5
     },
+    /* ---- Enemy knights: the goblins' hired blades ---------------------- */
+
+    /* Both of these hug their own front line, and that is NOT a stylistic choice —
+       it is forced by reachability. Take the player's front rank as P. The goblin
+       line stands at P+78 (Warrior contact), and the player's Archer stops 205 from
+       the goblins, so it sits at P-127 and its 260 range reaches only to P+133.
+       Mirror the player's own numbers onto an enemy and you get a unit at P+205
+       (Archer contact) or P+215 (Monk keepDistance) — 330-340px from the player's
+       archers, unreachable by everything the player owns. That is exactly the bug
+       the TNT's `lob` had to be invented to fix, and repeating it would hand the
+       goblins a back line with no counter.
+       So both sit inside P+133. Spacing pushes them to roughly P+124 in practice,
+       about 251 from the player's Archers — inside 260, with a little margin. */
+
+    /* Outranges the player's melee (Warrior range 130) so it plinks the front rank
+       from where swords cannot answer, but stands close enough that the player's own
+       Archers can shoot back. That duel is the point of the unit.
+       contact 120 / range 176 keeps the two-rank invariant: 120+46=166 < 176 <
+       120+92=212. */
+    FoeArcher: {
+      name: 'Renegade Archer', body: 70, enemy: true,
+      hp: 78, dmg: 18, contact: 120, range: 176, speed: 44,
+      cooldown: 1.5, height: 90, ranged: true, arrow: 'arrowFoe',
+      fps: { idle: 8, run: 10, attack: 13 }, hitFrame: 5
+    },
+
+    /* Heals the goblin line, which is the first thing in the game that asks the
+       player to pick a target rather than just the nearest one.
+       `heal` is derived against the player's throughput, the same way TNT.dmg was
+       derived against the Monk's: 26 every 2.4s is 10.8 hp/s, while two ranks of
+       Warriors put out about 42 hp/s. So one of these visibly prolongs the goblin
+       line without ever stalling it, and it takes three of them to blunt a proper
+       front — at which point killing them is obviously the play.
+       keepDistance 110 is the reachability figure above; anything near the player
+       Monk's 215 would make it invulnerable. */
+    FoeMonk: {
+      name: 'Renegade Monk', body: 58, enemy: true,
+      hp: 110, dmg: 0, heal: 26, contact: 999, range: 175, speed: 42,
+      cooldown: 2.4, height: 90, healer: true, keepDistance: 110,
+      fps: { idle: 8, run: 10, attack: 12 }, hitFrame: 6
+    },
+
     /* A rolling keg: quick, fragile, and detonates on contact instead of
        attacking. Kill it at range or it takes the front rank with it. */
     Barrel: {
@@ -632,7 +674,9 @@
           y: this.feetY - def.height * 0.62,
           target: t,
           dmg: this.dmg,
-          spr: def.aoe ? TS.SPR.dynamite : TS.SPR.arrow,
+          /* def.arrow lets a faction fire its own colour of arrow. */
+          spr: def.aoe ? TS.SPR.dynamite
+            : (def.arrow && TS.SPR[def.arrow]) || TS.SPR.arrow,
           aoe: def.aoe || 0,
           spin: !!def.aoe,
           speed: def.aoe ? 430 : ARROW_SPEED
@@ -1018,7 +1062,9 @@
      the biggest single bounty because reaching the artillery behind the screen is
      the hardest thing the player is asked to do. At these values battle 8 is back
      to 0 wins in 8 fresh attempts. Re-sweep after ANY change here. */
-  var BOUNTY = { Torch: 7, TNT: 20, Barrel: 7 };
+  /* The renegade knights are worth more than a Torch: the archer has to be shot
+     off its perch and the monk has to be picked out of a line. */
+  var BOUNTY = { Torch: 7, TNT: 20, Barrel: 7, FoeArcher: 16, FoeMonk: 18 };
   var GOLD_RATE_MUL = 0.90;
 
   Battle.prototype.bounty = function (unit) {

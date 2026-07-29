@@ -634,12 +634,12 @@
     buttons = [];
     if (won && hasNext) {
       buttons.push(new TS.UI.Button({
-        x: 146, y: 862, w: 250, h: 120, kind: 'big', label: 'NEXT', labelSize: 32,
+        x: 146, y: 906, w: 250, h: 120, kind: 'big', label: 'NEXT', labelSize: 32,
         onTap: function () { startBattle(battleIndex + 1); }
       }));
     } else {
       buttons.push(new TS.UI.Button({
-        x: 146, y: 862, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 32,
+        x: 146, y: 906, w: 250, h: 120, kind: 'bigRed', label: 'RETRY', labelSize: 32,
         onTap: function () { startBattle(battleIndex); }
       }));
     }
@@ -650,7 +650,7 @@
       ? function () { resultShown = false; playCutscene('end', goSelect); }
       : goSelect;
     buttons.push(new TS.UI.Button({
-      x: 436, y: 862, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
+      x: 436, y: 906, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
       onTap: toMap
     }));
   }
@@ -1070,7 +1070,14 @@
        that adjacency is the whole point, since those two numbers were previously
        shown near each other with nothing to say they were connected. */
     if (won) {
-      TS.text(ctx, starRuleText(), d.x + d.w / 2, d.y + 442, {
+      /* Evenly spaced between the stats block above and the reward below. It used
+         to sit 11px under "Castle remaining" but 23px above the coin, which read as
+         belonging to the stats rather than standing on its own. There was no room
+         to fix by nudging: the block was wedged into a 43px band. The RESULT BUTTONS
+         sat at y862 with 134px of panel empty beneath them, so they moved down to
+         906 and everything above got real air — about 28px under 'Castle remaining'
+         and 21px above the coin. */
+      TS.text(ctx, starRuleText(), d.x + d.w / 2, d.y + 462, {
         size: 17, fill: '#8d775c', stroke: null
       });
     }
@@ -1082,7 +1089,7 @@
          Centred as a group, not as an icon at a fixed offset plus centred text —
          that arrangement put the pair 15px left of the panel's middle, the same
          defect a tester found on the summon cards. */
-      UI.coinAmount(ctx, '+' + battle.reward, d.x + d.w / 2, d.y + 490, {
+      UI.coinAmount(ctx, '+' + battle.reward, d.x + d.w / 2, d.y + 508, {
         size: 32, scale: 0.6, fill: '#ffd257', stroke: '#5a3a12'
       });
     } else {

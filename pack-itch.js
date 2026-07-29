@@ -15,7 +15,7 @@
  *     index.html keeps it so the Pages build is unaffected.
  *
  *  2. ONLY THE ART THE GAME LOADS. The pack ships 521 PNGs and 54 .aseprite
- *     sources across five team colours; this game touches 132 files.
+ *     sources across five team colours; this game touches 139 files.
  *     The list below is not guessed — it is every image request a real page load
  *     actually made, captured from the browser. If you add art, re-capture it, or
  *     the missing file will 404 at runtime.
@@ -163,6 +163,13 @@ const ART = [
   "Units/Blue Units/Warrior/Warrior_Guard.png",
   "Units/Blue Units/Warrior/Warrior_Idle.png",
   "Units/Blue Units/Warrior/Warrior_Run.png",
+  "Units/Purple Units/Archer/Archer_Idle.png",
+  "Units/Purple Units/Archer/Archer_Run.png",
+  "Units/Purple Units/Archer/Archer_Shoot.png",
+  "Units/Purple Units/Archer/Arrow.png",
+  "Units/Purple Units/Monk/Heal.png",
+  "Units/Purple Units/Monk/Idle.png",
+  "Units/Purple Units/Monk/Run.png",
   "icons/icon-192.png"
 ];
 

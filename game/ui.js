@@ -480,8 +480,15 @@
        1272 for the status line above the cards at 1284. */
     UI.goldBar(ctx, 96, 1204, 690, battle.gold / battle.goldCap);
     UI.icon(ctx, 'icon03', 54, 1236, 0.86);
-    TS.text(ctx, Math.floor(battle.gold) + ' / ' + battle.goldCap, 441, 1237, {
-      size: 28, fill: '#fff8e6', stroke: '#3a2418'
+    /* Sized and placed to sit INSIDE the bar's recessed channel, not on its frame.
+       The BigBar art is 51px tall but the fill track is only 23 of that, starting
+       12px down — so a size-28 label centred on 1237 was both taller than the
+       channel and hanging ~12px out of its bottom. Centre on the track's middle
+       and size to fit it. GOLD_TRACK mirrors the numbers in UI.goldBar; changing
+       one without the other puts the label back outside the bar. */
+    var trackMid = 1204 + 12 + 23 / 2;
+    TS.text(ctx, Math.floor(battle.gold) + ' / ' + battle.goldCap, 441, trackMid, {
+      size: 22, fill: '#fff8e6', stroke: '#3a2418'
     });
 
     var full = battle.isFull(true);

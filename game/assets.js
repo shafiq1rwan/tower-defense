@@ -20,7 +20,7 @@
      Because each class belongs to exactly one faction, sprites are keyed by class
      alone — there is no team dimension to carry around. */
   TS.CLASSES = ['Pawn', 'Warrior', 'Archer', 'Monk', 'Lancer'];
-  TS.ENEMY_CLASSES = ['Torch', 'TNT', 'Barrel'];
+  TS.ENEMY_CLASSES = ['Torch', 'TNT', 'Barrel', 'FoeArcher', 'FoeMonk'];
 
   /* Frame size and foot anchor per class, measured from the sheets. Feet land on
      the same ground line for every class so mixed ranks line up. */
@@ -31,6 +31,9 @@
     Monk: { frame: 192, anchor: [96, 135] },
     /* The only class on 320px frames. */
     Lancer: { frame: 320, anchor: [160, 202] },
+    /* Enemy knights share the blue set's geometry exactly. */
+    FoeArcher: { frame: 192, anchor: [96, 135] },
+    FoeMonk: { frame: 192, anchor: [96, 135] },
     Torch: { frame: 192, anchor: [96, 133] },
     TNT: { frame: 192, anchor: [96, 133] },
     /* A rolling barrel bomb — smaller frames than the humanoids. */
@@ -98,6 +101,27 @@
   };
   TS.UNIT_SHEETS = UNIT_SHEETS;
 
+  /* Enemy knights, drawn from the pack's PURPLE colourway — distinct from the
+     player's blue and from the goblins' red at a glance, which is the whole reason
+     to use a third colour rather than recolouring red.
+     Same files, same frame counts and same feet anchors as the blue set; only the
+     directory differs. Registered as their own classes because sprites are keyed by
+     class alone, so a class belongs to exactly one faction. */
+  var FOE_DIR = 'Purple Units/';
+  var FOE_SHEETS = {
+    FoeArcher: {
+      idle: ['Archer/Archer_Idle.png', 6],
+      run: ['Archer/Archer_Run.png', 4],
+      attack: ['Archer/Archer_Shoot.png', 8]
+    },
+    FoeMonk: {
+      idle: ['Monk/Idle.png', 6],
+      run: ['Monk/Run.png', 4],
+      attack: ['Monk/Heal.png', 11]
+    }
+  };
+  TS.FOE_SHEETS = FOE_SHEETS;
+
   /* Avatar sheets are grouped in blocks of 5 by team colour, in this class
      order. Verified by eye: plumed helm, bowl helm, conical helm, tonsure,
      long hair. Knights only — the Goblin faction ships no portraits. */
@@ -120,6 +144,17 @@
         m['u:' + cls + ':' + anim] = UNIT_DIR + 'Blue Units/' + anims[anim][0];
       });
     });
+
+    /* Enemy Knights, same layout as the player's from the purple folder. */
+    Object.keys(FOE_SHEETS).forEach(function (cls) {
+      var fa = FOE_SHEETS[cls];
+      Object.keys(fa).forEach(function (anim) {
+        m['u:' + cls + ':' + anim] = UNIT_DIR + FOE_DIR + fa[anim][0];
+      });
+    });
+    /* A purple archer firing a blue arrow reads as a bug, and the pack ships the
+       matching one. */
+    m['arrowFoe'] = UNIT_DIR + FOE_DIR + 'Archer/Arrow.png';
 
     /* Enemy Goblins, one grid sheet per class. */
     Object.keys(GOBLIN_SHEETS).forEach(function (cls) {
@@ -321,6 +356,19 @@
       });
       SPR.unit[cls] = out;
     });
+    /* Enemy knights: identical shape to the player loop above, purple files. */
+    Object.keys(FOE_SHEETS).forEach(function (cls) {
+      var fsize = TS.unitFrameSize(cls);
+      var fa = TS.unitAnchor(cls);
+      var fout = {};
+      Object.keys(FOE_SHEETS[cls]).forEach(function (anim) {
+        var fimg = images['u:' + cls + ':' + anim];
+        if (!fimg) return;
+        fout[anim] = s(fimg, fsize, fsize, FOE_SHEETS[cls][anim][1], fa[0], fa[1]);
+      });
+      SPR.unit[cls] = fout;
+    });
+
     Object.keys(GOBLIN_SHEETS).forEach(function (cls) {
       var img = images['g:' + cls];
       if (!img) return;
@@ -345,6 +393,7 @@
     /* Arrow art spans x10-52, y26-37 and points right. Anchoring on the tip
        means the arrow's position IS its point, so impacts land where drawn. */
     SPR.arrow = s(images['arrow'], 64, 64, 1, 50, 32);
+    SPR.arrowFoe = s(images['arrowFoe'], 64, 64, 1, 50, 32);
 
     /* FX are centre-anchored. */
     SPR.fx = {

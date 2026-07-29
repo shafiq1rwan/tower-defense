@@ -60,6 +60,11 @@ so the smaller cap costs no difficulty and every unit you buy is one that fights
 | Torch Goblin | The horde staple — moderate melee, arrives constantly |
 | TNT Goblin | Artillery. Lobs dynamite **over** your front line at the archers and monks hiding behind it. Your archers can't shoot back from that distance — kill its screen and let your melee reach it |
 | Barrel Bomb | A fast rolling keg that detonates on contact. Kill it at range or it takes your front rank with it |
+| Renegade Archer | A knight fighting for the wrong side. Shoots your front rank from beyond sword reach — your own archers can answer it, your swords cannot |
+| Renegade Monk | Heals the goblin line. The first enemy that asks you to choose a target instead of just hitting the nearest thing |
+
+The renegades arrive from battle 5 and are the pack's purple colourway, so the three
+sides stay readable at a glance: blue is yours, red is the horde, purple is hired.
 
 Spamming one card will not carry you. Pawns alone stop working almost immediately,
 and massing Archers behind a wall — the strongest-looking play, since they kill from

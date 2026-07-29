@@ -15,6 +15,14 @@
   /* Enemy goblin classes. T = Torch (melee horde), N = TNT (area bomber),
      B = Barrel (fast suicide keg). */
   var T = 'Torch', N = 'TNT', B = 'Barrel';
+  /* Renegade knights the goblins have hired. RA = archer that outranges your melee,
+     RH = healer that keeps the goblin line standing. Introduced late: battles 1-4 are
+     still teaching the three goblins, and a healer only means anything once the
+     player has enough damage on the field for it to be worth denying.
+     NOT named A/H — 'A' is already the player's Archer above, and redeclaring it put
+     a non-purchasable class into every level's card list, which showed up in game as
+     a summon card costing 'undefined'. */
+  var RA = 'FoeArcher', RH = 'FoeMonk';
 
   /* `buff` multiplies enemy HP and damage. It stays low deliberately: the enemy
      already gets free units, so a large multiplier on top makes late battles
@@ -103,6 +111,7 @@
         { t: 32, cls: B, n: 2, gap: 2.2 },
         { t: 46, cls: T, n: 4, gap: 0.4 },
         { t: 60, cls: N, n: 2, gap: 1.0 },
+        { t: 70, cls: RA, n: 1 },
         { t: 76, cls: T, n: 3, gap: 0.4 }
       ],
       endless: { every: 10, cap: 5, classes: [T, N, T, B, T] }
@@ -121,9 +130,10 @@
         { t: 30, cls: B, n: 2, gap: 1.8 },
         { t: 44, cls: T, n: 5, gap: 0.4 },
         { t: 58, cls: N, n: 2, gap: 0.9 },
+        { t: 66, cls: RA, n: 2, gap: 1.2 },
         { t: 74, cls: T, n: 3, gap: 0.4 }
       ],
-      endless: { every: 9.5, cap: 5, classes: [T, N, B, T, N] }
+      endless: { every: 9.5, cap: 5, classes: [T, N, B, T, RA] }
     },
     {
       name: 'Iron Tide',
@@ -140,9 +150,10 @@
         { t: 44, cls: T, n: 5, gap: 0.35 },
         { t: 58, cls: N, n: 3, gap: 0.8 },
         { t: 74, cls: B, n: 1 },
+        { t: 80, cls: RH, n: 1 },
         { t: 86, cls: T, n: 3, gap: 0.35 }
       ],
-      endless: { every: 9, cap: 6, classes: [T, N, B, T, N, T] }
+      endless: { every: 9, cap: 6, classes: [T, N, B, T, RA, T] }
     },
     {
       name: 'The Goblin Camp',
@@ -158,10 +169,12 @@
         { t: 30, cls: B, n: 2, gap: 1.5 },
         { t: 44, cls: T, n: 6, gap: 0.35 },
         { t: 60, cls: N, n: 3, gap: 0.8 },
+        { t: 70, cls: RA, n: 2, gap: 1.1 },
         { t: 76, cls: B, n: 2, gap: 1.4 },
+        { t: 84, cls: RH, n: 2, gap: 1.6 },
         { t: 92, cls: T, n: 3, gap: 0.3 }
       ],
-      endless: { every: 8.5, cap: 6, classes: [T, N, B, T, N, T, B] }
+      endless: { every: 8.5, cap: 6, classes: [T, N, B, RA, N, T, RH] }
     }
   ];
 
