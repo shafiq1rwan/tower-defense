@@ -189,6 +189,21 @@
   /* The Pawn's recharge is set so it cannot absorb the whole gold income on its
      own — otherwise spamming the cheapest unit converts 100% of income into
      front-line bodies and dominates every other strategy. */
+  /* How close a unit closes to a BUILDING, as opposed to another unit.
+     `contact` is body-to-body clearance — roughly one body width, so two opposing
+     ranks stand chest to chest with only their weapons overlapping. A wall has no
+     body, so reusing that number left a strip of bare ground between the sprite and
+     the stonework: measured, a Warrior stopped 52px short of the hut's art edge and
+     appeared to be swinging at nothing.
+     Derived rather than picked, and deliberately kept ABOVE range - 2*SPACING so the
+     third rank still cannot reach the wall. That keeps two ranks hitting a building
+     exactly as before, which is what makes this a cosmetic fix rather than a stealth
+     buff to how fast bases fall. The Lancer lands at 72 and stays visibly back —
+     correct, since striking from a lance length is the whole point of the class. */
+  function castleContact(def) {
+    return Math.max(24, def.range - 2 * SPACING + 4);
+  }
+
   var CARD_CD = { Pawn: 1.7, Warrior: 2.2, Archer: 3.0, Monk: 5.0, Lancer: 7.0 };
   TS.cardCooldown = function (cls) { return CARD_CD[cls] || 1.5; };
 
@@ -807,7 +822,7 @@
           ahead. Otherwise keep closing — units creep forward between swings,
           which is what makes the front line push toward whoever is losing
           instead of locking in place. */
-    if (this.findEnemy(def.contact) || castleDist <= def.contact) {
+    if (this.findEnemy(def.contact) || castleDist <= castleContact(def)) {
       this.blockT = 0;
       this.setAnim('idle');
       return;

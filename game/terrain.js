@@ -51,9 +51,20 @@
 
     playerFrontX: 136,
     enemyFrontX: 698,
-    /* Spawns sit behind their own base art so units file out from behind it. */
-    playerSpawnX: 104,
-    enemySpawnX: 742,
+    /* Spawns sit just CLEAR of their own base art, not inside it.
+       They used to sit inside the footprint (104 / 742) so units filed out from
+       behind the wall, but that made the three depth rows disagree: the bases stand
+       on the middle row, so the near row drew IN FRONT of the building and appeared
+       to stand on the masonry, while the middle and far rows were hidden behind it.
+       One row on top of the tower and two invisible reads as a bug either way round.
+       Placed off the widest body (Warrior, 79px) against the art edges — tower art
+       ends at 122, hut art begins at 711 — so a spawning unit never overlaps
+       stonework. The per-row stagger in Unit() still fans them out by 10px, and only
+       the far row clips the building at all, which reads as depth rather than error.
+       The front/behind split in Battle.draw is now reserved for units that have
+       genuinely REACHED a base, which is what it was written for. */
+    playerSpawnX: 148,
+    enemySpawnX: 684,
 
     laneLeft: 60,
     laneRight: 800
