@@ -59,12 +59,16 @@
     /* Upper field only. A cloud drifting across the lower field washes out the
        strip between the cliff and the card panel. */
     var cloudBands = [340, 470, 578, 396, 528, 300];
+    /* The pool can be short of 8 if a cloud sheet failed to download — assets.js
+       skips missing ones so the loader survives. No pool, no clouds. */
+    var cloudPool = TS.SPR.decor.cloud;
     var nClouds = Math.min(theme.clouds == null ? 3 : theme.clouds, cloudBands.length);
+    if (!cloudPool.length) nClouds = 0;
     var cloudA = theme.cloudAlpha == null ? 1 : theme.cloudAlpha;
     var cloudV = theme.cloudSpeed == null ? 1 : theme.cloudSpeed;
     for (i = 0; i < nClouds; i++) {
       Scene.clouds.push({
-        spr: TS.SPR.decor.cloud[(rnd() * 8) | 0],
+        spr: cloudPool[(rnd() * cloudPool.length) | 0],
         x: rnd() * (TS.W + 600) - 300,
         y: cloudBands[i] + rnd() * 40 - 20,
         vx: (5 + rnd() * 9) * cloudV,
@@ -200,7 +204,11 @@
   function buildWeather(theme, rnd) {
     Scene.weather = [];
     Scene.flash = 0;
-    Scene.flashT = 0;
+    /* First strike waits a real gap. Starting at 0 fired the bolt on the very
+       first update tick, so every storm battle opened with a full-screen flash
+       at t=0 — deterministically, on every replay. */
+    Scene.flashT = 2.6 + rnd() * 5.5;
+    Scene.flashEcho = 0;
     var w = theme.weather;
     if (!w) return;
     var n = w.count || 0;
@@ -322,12 +330,19 @@
     }
 
     /* Lightning. Long dark gaps then a double flash, because a single evenly
-       timed blink reads as a rendering fault rather than a storm. */
+       timed blink reads as a rendering fault rather than a storm. The echo is
+       the second strike: it re-lights the sky to 0.8 while the first pulse is
+       mid-decay, which is the flicker real lightning has. */
     if (w.lightning) {
       Scene.flashT -= dt;
       if (Scene.flashT <= 0) {
         Scene.flashT = 3.4 + srnd() * 5.5;
         Scene.flash = 1;
+        Scene.flashEcho = 0.16 + srnd() * 0.1;
+      }
+      if (Scene.flashEcho > 0) {
+        Scene.flashEcho -= dt;
+        if (Scene.flashEcho <= 0) Scene.flash = Math.max(Scene.flash, 0.8);
       }
       if (Scene.flash > 0) Scene.flash = Math.max(0, Scene.flash - dt * 3.4);
     }

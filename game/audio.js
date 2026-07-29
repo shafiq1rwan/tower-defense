@@ -87,6 +87,12 @@
     g.connect(o.bus || sfxBus);
     osc.start(t0);
     osc.stop(t0 + o.dur + 0.02);
+    /* Music notes are remembered so a theme switch or a pause can silence what
+       is already committed to the graph; effects stay fire-and-forget. Without
+       this nothing held a reference to a scheduled bar, so it was uncancellable. */
+    if (o.bus && o.bus === musicBus) {
+      mNotes.push({ o: osc, g: g, until: t0 + o.dur + 0.05 });
+    }
   }
 
   /* ONE noise buffer, built at unlock and reused for every burst.
@@ -227,6 +233,23 @@
   var mTimer = null;
   var mNextBar = 0;      // ctx time of the next bar to schedule
   var mBar = 0;          // bar counter, drives the progression
+  var mNotes = [];       // live music notes, so they CAN be cut (see tone())
+
+  /* Cut everything the scheduler has committed. Bars are queued up to LOOKAHEAD
+     ahead and each note rings for ~2.5s, so without this a theme switch on
+     NEXT/RETRY played two songs at once for several seconds, and a pause let the
+     old bars bleed into the menu. */
+  function stopMusicNotes() {
+    for (var i = 0; i < mNotes.length; i++) {
+      var n = mNotes[i];
+      try {
+        n.g.gain.cancelScheduledValues(0);
+        n.g.gain.value = 0;
+        n.o.stop();
+      } catch (e) { /* already stopped */ }
+    }
+    mNotes.length = 0;
+  }
   var mMood = null;
   var LOOKAHEAD = 1.2;   // seconds of music kept queued
   var TICK = 320;        // ms between scheduler wakeups
@@ -244,6 +267,10 @@
 
   function pump() {
     if (!ctx || !musicBus || !mMood) return;
+    /* Drop notes that have already rung out, so the list never grows. */
+    for (var i = mNotes.length - 1; i >= 0; i--) {
+      if (mNotes[i].until < ctx.currentTime) mNotes.splice(i, 1);
+    }
     /* Catch up if the tab was asleep, but never schedule a backlog of bars. */
     if (mNextBar < ctx.currentTime) mNextBar = ctx.currentTime + 0.05;
     var guard = 0;
@@ -295,6 +322,8 @@
     /* Remember the mood even when muted, so un-muting mid-battle can resume into
        the right key rather than needing the level restarted. */
     if (!enabled) return;
+    /* Silence the outgoing theme before the new one starts scheduling. */
+    stopMusicNotes();
     mNextBar = ctx.currentTime + 0.08;
     if (mTimer) return;              // already pumping
     mTimer = window.setInterval(pump, TICK);
@@ -304,9 +333,13 @@
   Music.stop = function () {
     mMood = null;
     if (mTimer) { window.clearInterval(mTimer); mTimer = null; }
+    stopMusicNotes();
   };
 
-  Music.suspend = function () { if (mTimer) { window.clearInterval(mTimer); mTimer = null; } };
+  Music.suspend = function () {
+    if (mTimer) { window.clearInterval(mTimer); mTimer = null; }
+    stopMusicNotes();
+  };
   Music.resume = function () {
     if (!mMood || mTimer || !ctx) return;
     mNextBar = ctx.currentTime + 0.08;

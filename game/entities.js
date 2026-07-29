@@ -284,9 +284,18 @@
     }
   };
 
+  /* Draw-side jitter counter. The shake used to come from Math.random, but draw
+     runs a VARIABLE number of times per sim step (refresh rate, fast-forward),
+     so consuming the sim's global stream from here made 1x/2x/3x interleave it
+     differently whenever a base was shaking — the one place rendering could
+     still perturb combat. A counter through sin looks identical and draws
+     nothing. Draw-only state, like `push` and `punch`. */
+  var baseShakeTick = 0;
+
   Base.prototype.draw = function (ctx) {
     var meta = this.meta;
-    var jx = this.shake ? (Math.random() * 2 - 1) * this.shake : 0;
+    baseShakeTick++;
+    var jx = this.shake ? Math.sin(baseShakeTick * 2.399) * this.shake : 0;
     TS.blobShadow(ctx, this.x, this.y - 6, meta.shadowR, 24, 0.2);
 
     if (this.dead) {
@@ -481,7 +490,12 @@
     return true;
   };
 
-  Unit.prototype.die = function () {
+  /* `selfDestruct` marks a death the player had no hand in — a Barrel detonating
+     on its own schedule. Without it the suicide path paid the PLAYER: die() has
+     no notion of cause, so every Barrel that bombed the line also credited a
+     kill and flew 7 gold to the purse. A Barrel shot down BEFORE it detonates
+     still pays out through the normal hurt() path, which is the bounty's point. */
+  Unit.prototype.die = function (selfDestruct) {
     if (this.dead) return;
     this.dead = true;
     this.state = 'die';
@@ -498,7 +512,7 @@
     TS.Audio.play('die');
     if (this.isPlayer) {
       this.battle.stats.lost++;
-    } else {
+    } else if (!selfDestruct) {
       this.battle.stats.killed++;
       this.battle.bounty(this);
     }
@@ -676,7 +690,7 @@
       this.battle.detonate(this.x, this.feetY - 20, def.aoe, this.dmg,
         this.isPlayer, true);
       this.hp = 0;
-      this.die();
+      this.die(true);
       return;
     }
 
@@ -1041,9 +1055,19 @@
       }
     }
     var base = fromPlayer ? this.enemyCastle : this.playerCastle;
-    if (!base.dead && Math.abs(base.frontX - x) <= radius) {
-      base.hurt(dmg);
-      TS.FX.number(x, y - 90, dmg, 'big');
+    /* The base occupies the span from its gameplay front (frontX) back to its art
+       centre (x) — 70px apart on both sides. Testing frontX alone silently made
+       dynamite harmless to castles: TNT aims its lob at base.x, so the blast
+       landed 70px from the point being tested and 70 > the 58px radius, every
+       shot. Distance to the SPAN catches a hit anywhere on the footprint while
+       leaving unit blasts (measured from a point, above) untouched. */
+    if (!base.dead) {
+      var lo = Math.min(base.x, base.frontX), hi = Math.max(base.x, base.frontX);
+      var bd = x < lo ? lo - x : x > hi ? x - hi : 0;
+      if (bd <= radius) {
+        base.hurt(dmg);
+        TS.FX.number(x, y - 90, dmg, 'big');
+      }
     }
     TS.FX.explosion(x, y, !!big);
   };

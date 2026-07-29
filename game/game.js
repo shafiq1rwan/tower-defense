@@ -107,6 +107,13 @@
     };
   }
 
+  /* The game is single-pointer: exactly one press can be in flight. The first
+     finger down claims `ptrId` and every event from any other pointerId is
+     ignored until it releases. Without this, a second finger overwrote
+     pointer.target while the first button's `pressed` flag stayed set forever,
+     and a two-finger tap on a cutscene advanced the dialogue twice. */
+  var ptrId = null;
+
   function bindInput() {
     canvas.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'touch' && !pointer.touch) {
@@ -114,6 +121,8 @@
         document.body.classList.add('touch');
       }
       TS.Audio.unlock();
+      if (ptrId !== null) { e.preventDefault(); return; }   // a press is in flight
+      ptrId = e.pointerId;
       var p = toLogical(e.clientX, e.clientY);
       pointer.x = p.x; pointer.y = p.y; pointer.down = true;
       pointer.target = pick(p.x, p.y);
@@ -123,6 +132,7 @@
     });
 
     canvas.addEventListener('pointermove', function (e) {
+      if (ptrId !== null && e.pointerId !== ptrId) return;
       var p = toLogical(e.clientX, e.clientY);
       pointer.x = p.x; pointer.y = p.y;
       if (pointer.down && pointer.target) {
@@ -132,6 +142,8 @@
     });
 
     function release(e) {
+      if (ptrId === null || e.pointerId !== ptrId) return;
+      ptrId = null;
       var p = pointer.target;
       pointer.down = false;
       if (p) {
@@ -144,10 +156,18 @@
            hit-tested at pointerdown, so reaching here means empty space. */
         TS.Story.advance();
       }
-      if (e) e.preventDefault();
+      e.preventDefault();
     }
     canvas.addEventListener('pointerup', release);
-    canvas.addEventListener('pointercancel', release);
+    /* A CANCELLED gesture — edge swipe, palm rejection, incoming call — must be
+       discarded, never activated. Routing it through release() fired whatever the
+       finger happened to rest on, including RESET and LEAVE confirms. */
+    canvas.addEventListener('pointercancel', function (e) {
+      if (ptrId === null || e.pointerId !== ptrId) return;
+      ptrId = null;
+      pointer.down = false;
+      if (pointer.target) { pointer.target.pressed = false; pointer.target = null; }
+    });
     canvas.addEventListener('pointerleave', function () {
       pointer.hand = false;
       if (!pointer.down) { pointer.x = -999; pointer.y = -999; }
@@ -162,9 +182,13 @@
         return;
       }
       if (screen !== 'battle' || paused || !battle) {
-        if (e.key === 'Escape' && paused) togglePause();
+        /* Unpause is meaningful only where pause is: on the battle screen. */
+        if (e.key === 'Escape' && paused && screen === 'battle') togglePause();
         return;
       }
+      /* The result panel is up: its NEXT/RETRY/MAP buttons own the screen, and
+         pausing now would throw them away for the pause menu's set. */
+      if (battle.over) return;
       var n = parseInt(e.key, 10);
       if (n >= 1 && n <= hud.cards.length) {
         tapCard(hud.cards[n - 1]);
@@ -360,6 +384,13 @@
 
   function goSelect() {
     screen = 'select';
+    /* Same teardown as goTitle. MAP in the quit confirm lands here from a PAUSED
+       battle, and a leaked `paused` was fatal: Escape's unpause fallback then
+       rebuilt the 2-button battle HUD set on this screen, and drawSelectRows
+       indexes buttons[0..7] — TypeError, dead rAF loop, frozen game. */
+    paused = false;
+    confirming = null;
+    battle = null;
     stopMusic();
     useDefaultBackdrop();
     buttons = [];
@@ -585,12 +616,24 @@
       }),
       new TS.UI.Button({
         x: 432, y: 756, w: 250, h: 120, kind: 'big',
-        icon: 'icon12', onTap: function () { TS.Audio.toggle(); }
+        /* toggle() resumes music when enabling — right everywhere except here,
+           where the game is paused and the music is deliberately suspended.
+           Re-suspend so unmuting doesn't start the theme under the pause menu;
+           unpausing resumes it as usual. */
+        icon: 'icon12', onTap: function () {
+          TS.Audio.toggle();
+          TS.Audio.Music.suspend();
+        }
       })
     ];
   }
 
   function togglePause() {
+    /* A press can straddle the moment the battle ends — pointerdown on the HUD
+       pause button, result appears, pointerup — and activate() fires the captured
+       target even though showResult has replaced `buttons`. Pausing then strands
+       the player: RESUME restores the battle HUD set, not NEXT/RETRY/MAP. */
+    if (!battle || battle.over) return;
     paused = !paused;
     /* Suspend rather than stop, so resuming picks the phrase back up instead of
        restarting the loop from bar one every time the player checks the menu. */

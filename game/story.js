@@ -236,7 +236,10 @@
     if (shown >= text.length) {
       ctx.save();
       ctx.globalAlpha = 0.45 + 0.35 * Math.sin(clock * 3.4);
-      TS.text(ctx, at + 1 < lines.length ? 'tap to continue' : 'tap to begin',
+      /* The final-line prompt promises what the tap DOES: the eight pre-battle
+         scenes lead into a fight, but the epilogue ('end') returns to the map. */
+      TS.text(ctx, at + 1 < lines.length ? 'tap to continue'
+        : key === 'end' ? 'tap to finish' : 'tap to begin',
         BOX.x + BOX.w - PAD, BOX.y + BOX.h - 42,
         { size: 19, fill: '#6b5238', stroke: null, align: 'right' });
       ctx.restore();

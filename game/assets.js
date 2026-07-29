@@ -418,9 +418,14 @@
       SPR.decor.stump.push(s(images['stump' + i], 192, 256, 1, 96, 240));
     }
     for (var c = 1; c <= 8; c++) {
-      /* Clouds are single sprites, NOT frame grids. */
+      /* Clouds are single sprites, NOT frame grids. Guarded because this is the
+         one build path that DEREFERENCES the image (for its size): the loader
+         survives a failed download by design, but an unguarded `ci.width` here
+         threw and hung the loading screen at 100% if any cloud 404'd. */
       var ci = images['cloud' + c];
-      SPR.decor.cloud.push(s(ci, ci.width, ci.height, 1, ci.width / 2, ci.height / 2));
+      if (ci) {
+        SPR.decor.cloud.push(s(ci, ci.width, ci.height, 1, ci.width / 2, ci.height / 2));
+      }
     }
     SPR.decor.sheepIdle = s(images['sheepIdle'], 128, 128, 6, 64, 108);
     SPR.decor.sheepGrass = s(images['sheepGrass'], 128, 128, 12, 64, 108);

@@ -155,13 +155,18 @@ sim's stream once (one already-won battle moved 100% → 92% tower HP); decoupli
 changed no win or loss at all.
 
 **The root cause is still there, though: the SIM itself uses global `Math.random`.**
-Eight calls remain in entities.js — first-swing `atkTimer` jitter, the 55% `guard`
-chance, the burning-base fire, and `detonate`'s knockback scatter. While those read the
-global stream, *any* `Math.random()` anywhere in the process perturbs combat, so the
-rule above is a discipline rather than a guarantee. Giving the simulation its own
-seeded generator would make it airtight — and would remove the run-to-run sweep
-variance that makes single-battle results untrustworthy. Not done yet; it is the single
-highest-value cleanup left in the codebase.
+Six calls remain in entities.js — first-swing `atkTimer` jitter, the 55% `guard`
+chance, and four in the burning-base fire. (`detonate`'s knockback is now a
+deterministic falloff, and the base-shake draw jitter was moved to a counter — it was
+the one *render-path* consumer of the stream, which is strictly worse than a sim-side
+one: draws-per-step vary with refresh rate and speed, so 1x/2x/3x interleaved the
+stream differently while a base shook, and `fastSim` never drew at all, so sweeps
+validated a stream live play never saw.) While the six remain, *any* `Math.random()`
+anywhere in the process perturbs combat, so the rule above is a discipline rather
+than a guarantee. Giving the simulation its own seeded generator would make it
+airtight — and would remove the run-to-run sweep variance that makes single-battle
+results untrustworthy. Not done yet; it is the single highest-value cleanup left in
+the codebase.
 
 **Two more measured traps, in the water art.** `Foam.png` is 8 frames of 192px but
 the ring is only ~82px of ink (x55-136) inset in the middle of the cell, so spacing

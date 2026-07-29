@@ -14,7 +14,7 @@
  * BUMP `VERSION` whenever anything in game/ changes, or returning visitors will
  * keep running the cached copy.
  */
-const VERSION = 'v39';
+const VERSION = 'v40';
 const SHELL = 'ts-shell-' + VERSION;
 const RUNTIME = 'ts-runtime-' + VERSION;
 const KEEP = [SHELL, RUNTIME];
@@ -114,8 +114,17 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(SHELL);
-        cache.put('./index.html', fresh.clone());
+        /* Only a SUCCESSFUL fetch of the app shell itself may refresh the cached
+           shell. fetch() resolves on a 404, and any in-scope navigation lands
+           here — without both checks a mistyped deep link stored the host's 404
+           page (or a stray README tab stored that document) as index.html, and
+           the installed PWA then booted into it offline. */
+        const isShell = url.pathname.endsWith('/') ||
+          url.pathname.endsWith('/index.html');
+        if (fresh.ok && isShell) {
+          const cache = await caches.open(SHELL);
+          cache.put('./index.html', fresh.clone());
+        }
         return fresh;
       } catch (err) {
         return (await caches.match('./index.html')) ||
