@@ -371,13 +371,18 @@
     TS.drawFrame(ctx, spr, (clock * fps) | 0, x + w / 2, y + h - 50,
       { scale: CARD_ART_SCALE[this.cls] || 1 });
 
-    /* Cost strip along the bottom, as in the reference. */
+    /* Cost strip along the bottom, as in the reference.
+       The coin and the number are centred as ONE GROUP via coinAmount. Placing
+       them separately — an icon pinned at x+30 and the number centred on the card
+       — put the pair's real centre 14px left of the card's, which is what a tester
+       spotted as "the number used for spawn is not centred". Same bug, and same
+       fix, as the HUD purse and the Barracks price plates. */
     var sh = 40;
     ctx.fillStyle = '#4a3324';
     ctx.fillRect(x, y + h - sh, w, sh);
-    UI.icon(ctx, 'icon03', x + 30, y + h - sh / 2, 0.44);
-    TS.text(ctx, this.def.cost, x + w / 2 + 16, y + h - sh / 2 + 1, {
-      size: 26, fill: affordable ? '#ffd257' : '#ff8f7a', stroke: '#241812'
+    UI.coinAmount(ctx, this.def.cost, x + w / 2, y + h - sh / 2, {
+      size: 26, scale: 0.44,
+      fill: affordable ? '#ffd257' : '#ff8f7a', stroke: '#241812'
     });
 
     /* Recharge reads as the card filling from the bottom. A radial sweep looks

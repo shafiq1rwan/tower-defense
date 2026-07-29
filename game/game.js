@@ -181,6 +181,11 @@
 
   /* Cards are hit-tested before buttons: they are the busiest target. */
   function pick(x, y) {
+    /* Nothing is tappable mid-transition. The outgoing screen's buttons are still
+       in `buttons` during the fade out, and its rows are drawn offset from where
+       they really are — so a tap would either hit the wrong thing or fire a second
+       navigation on top of the one already running. */
+    if (trans) return null;
     if (screen === 'battle' && !paused && hud && battle && !battle.over) {
       for (var i = 0; i < hud.cards.length; i++) {
         if (hud.cards[i].contains(x, y)) return hud.cards[i];
@@ -215,6 +220,60 @@
      as long as someone browses, which wears out a four-bar phrase fast. */
   function stopMusic() { TS.Audio.Music.stop(); }
 
+  /* ---------------------------------------------------- menu transitions -- */
+
+  /* The menus all share one terrain backdrop, so sliding the whole SCREEN would
+     look broken — the background would sit still while its contents moved. Only
+     the UI layer animates: the outgoing panel lifts and fades, then the incoming
+     one rises into place, with the battle rows staggered so the list assembles
+     rather than appearing whole.
+     Runs on the real-time clock, like every other piece of interface animation. */
+  /* Kept deliberately brief. Input is blocked for the whole transition — see
+     pick() — so every millisecond here is a millisecond the menu ignores taps.
+     0.10 + 0.20 + eight rows at 0.018 lands a shade under half a second, which
+     reads as responsive; the first draft ran to 0.61s and felt sticky. */
+  var trans = null;
+  var TR_OUT = 0.10, TR_IN = 0.20, TR_STAGGER = 0.018;
+
+  /* Wrap a screen change so it animates. `go` is the ordinary goX function; it
+     fires at the midpoint, which is why the incoming screen never flashes up
+     before the outgoing one has left. */
+  function goAnimated(go) {
+    if (trans) return;          // already moving; ignore the second tap
+    trans = { t: 0, phase: 'out', go: go };
+  }
+
+  function updateTransition(dt) {
+    if (!trans) return;
+    trans.t += dt;
+    if (trans.phase === 'out') {
+      if (trans.t < TR_OUT) return;
+      trans.go();
+      trans.phase = 'in';
+      trans.t = 0;
+    } else if (trans.t >= TR_IN + TS.Levels.count * TR_STAGGER) {
+      trans = null;
+    }
+  }
+
+  /* Alpha and vertical offset for the UI layer this frame, or null when idle. */
+  function transStyle() {
+    if (!trans) return null;
+    if (trans.phase === 'out') {
+      var k = TS.clamp(trans.t / TR_OUT, 0, 1);
+      return { alpha: 1 - k, dy: -30 * k };
+    }
+    var e = TS.easeOutCubic(TS.clamp(trans.t / TR_IN, 0, 1));
+    return { alpha: e, dy: 46 * (1 - e) };
+  }
+
+  /* Extra offset for row `i` of the battle list, so the list cascades in. */
+  function rowStagger(i) {
+    if (!trans || trans.phase !== 'in' || screen !== 'select') return 0;
+    var e = TS.easeOutCubic(TS.clamp((trans.t - i * TR_STAGGER) / TR_IN, 0, 1));
+    return 54 * (1 - e);
+  }
+
   function useDefaultBackdrop() {
     var theme = TS.defaultTheme();
     if (TS.Terrain.theme === theme) return;
@@ -232,7 +291,7 @@
     buttons = [
       new TS.UI.Button({
         x: 256, y: 980, w: 320, h: 140, kind: 'big', label: 'PLAY', labelSize: 44,
-        onTap: goSelect
+        onTap: function () { goAnimated(goSelect); }
       }),
       new TS.UI.Button({
         x: 30, y: 1300, kind: 'sqBlue', icon: 'icon12',
@@ -303,11 +362,11 @@
     }
     buttons.push(new TS.UI.Button({
       x: 52, y: 1216, w: 340, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 30,
-      onTap: goShop
+      onTap: function () { goAnimated(goShop); }
     }));
     buttons.push(new TS.UI.Button({
       x: 440, y: 1216, w: 340, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 34,
-      onTap: goTitle
+      onTap: function () { goAnimated(goTitle); }
     }));
   }
 
@@ -348,7 +407,7 @@
     });
     buttons.push(new TS.UI.Button({
       x: 256, y: 1216, w: 320, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 38,
-      onTap: goSelect
+      onTap: function () { goAnimated(goSelect); }
     }));
   }
 
@@ -569,6 +628,7 @@
     last = now;
     uiClock += dt;
     lastDt = dt;
+    updateTransition(dt);
 
     if (screen === 'battle' && !paused) {
       acc += dt * speed;
@@ -635,6 +695,16 @@
     TS.Scene.drawFront(ctx);
     ctx.restore();
 
+    /* The whole UI layer — panels, buttons and the battle list — animates as one
+       during a menu transition. The world behind it is untouched, and the cursor is
+       drawn after the restore so it never fades with the interface. */
+    var ts = transStyle();
+    if (ts) {
+      ctx.save();
+      ctx.globalAlpha = TS.clamp(ts.alpha, 0, 1);
+      ctx.translate(0, Math.round(ts.dy));
+    }
+
     if (screen === 'cutscene') {
       /* The SKIP button is drawn by the shared loop below, so it lands on top of
          the dim overlay and the dialogue box. */
@@ -657,6 +727,8 @@
     }
 
     if (screen === 'select') drawSelectRows();
+
+    if (ts) ctx.restore();
 
     if (!pointer.touch && pointer.x > -900) {
       TS.UI.drawCursor(ctx, pointer.x, pointer.y, pointer.hand);
@@ -791,7 +863,9 @@
       var unlocked = TS.Save.isUnlocked(i);
       var b = buttons[i];
       var pressed = b.pressed ? 3 : 0;
-      var top = b.y + pressed;
+      /* Offsetting `top` alone cascades the whole row: the ribbon, both text lines
+         and the swords all derive their position from it. */
+      var top = b.y + pressed + rowStagger(i);
       /* Big ribbon art is 103px tall, matching the button rect exactly. */
       UI.bigRibbon(ctx, b.x, top, b.w, unlocked ? UI.PLATE.teal : UI.PLATE.black);
       /* Centre of the coloured band, which sits above the geometric middle. */
@@ -965,10 +1039,12 @@
     if (won) {
       /* Pushed down from 470 to make room for the sword rule above: the coin is
          38px tall around its centre, so at 470 its top edge reached back up into
-         the legend's last line. */
-      UI.icon(ctx, 'icon03', d.x + d.w / 2 - 62, d.y + 490, 0.6);
-      TS.text(ctx, '+' + battle.reward, d.x + d.w / 2 + 26, d.y + 490, {
-        size: 32, fill: '#ffd257', stroke: '#5a3a12'
+         the legend's last line.
+         Centred as a group, not as an icon at a fixed offset plus centred text —
+         that arrangement put the pair 15px left of the panel's middle, the same
+         defect a tester found on the summon cards. */
+      UI.coinAmount(ctx, '+' + battle.reward, d.x + d.w / 2, d.y + 490, {
+        size: 32, scale: 0.6, fill: '#ffd257', stroke: '#5a3a12'
       });
     } else {
       TS.text(ctx, battle.byTimeout ? 'Time ran out.' : 'The castle has fallen.',

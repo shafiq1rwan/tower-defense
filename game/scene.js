@@ -352,20 +352,34 @@
   Scene.drawBack = function (ctx) {
     var i, o;
 
-    for (i = 0; i < Scene.water.length; i++) {
-      o = Scene.water[i];
-      if (o.kind === 'foam') {
-        /* Not opaque: at full alpha the overlapping rings merge into a solid pale
-           band and the lake reads as more froth than water. Letting the teal show
-           through keeps it as surf on a shoreline. */
-        TS.drawFrame(ctx, TS.SPR.decor.foam, o.phase | 0, o.x, o.y,
-          { flip: o.flip, alpha: 0.72 });
-      } else if (o.kind === 'rock') {
-        TS.drawFrame(ctx, o.spr, o.phase | 0, o.x, o.y, { flip: o.flip });
-      } else if (o.kind === 'duck') {
-        TS.drawFrame(ctx, TS.SPR.decor.duck, o.phase | 0,
-          o.x, o.y + Math.sin(o.bob) * 2, { flip: o.flip, scale: 1.4 });
+    /* Everything on the water is CLIPPED TO THE WATER. Both foam sheets are rings
+       (~82px of ink centred in a 192px cell), not shoreline strips, so a ring drawn
+       across the shore spills half of itself onto the grass — which reads as splash
+       sitting beside the ground tile rather than washing up under it. Clipping to
+       the band keeps the land edge crisp and shows only the half of each ring that
+       is genuinely in the water, so the shore overlaps the surf as it should. */
+    var wb = Scene.theme && Scene.theme.water;
+    if (wb && Scene.water.length) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, wb.y0, TS.W, wb.y1 - wb.y0);
+      ctx.clip();
+      for (i = 0; i < Scene.water.length; i++) {
+        o = Scene.water[i];
+        if (o.kind === 'foam') {
+          /* Not opaque: at full alpha the overlapping rings merge into a solid pale
+             band and the lake reads as more froth than water. Letting the teal show
+             through keeps it as surf on a shoreline. */
+          TS.drawFrame(ctx, TS.SPR.decor.foam, o.phase | 0, o.x, o.y,
+            { flip: o.flip, alpha: 0.72 });
+        } else if (o.kind === 'rock') {
+          TS.drawFrame(ctx, o.spr, o.phase | 0, o.x, o.y, { flip: o.flip });
+        } else if (o.kind === 'duck') {
+          TS.drawFrame(ctx, TS.SPR.decor.duck, o.phase | 0,
+            o.x, o.y + Math.sin(o.bob) * 2, { flip: o.flip, scale: 1.4 });
+        }
       }
+      ctx.restore();
     }
 
     for (i = 0; i < Scene.clouds.length; i++) {
