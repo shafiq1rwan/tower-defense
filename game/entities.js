@@ -1308,7 +1308,17 @@
     for (var i = 0; i < this.units.length; i++) {
       var u = this.units[i];
       if (u.dead || u.isPlayer) continue;
-      if (Math.abs(u.x - x) <= radius) u.hurt(dmg, null);
+      if (Math.abs(u.x - x) <= radius) {
+        u.hurt(dmg, null);
+        /* A small REAL shove, rearward only — allowed by the same reasoning as
+           detonate's: the volley is rare and discrete (one rain per 22s), so it
+           cannot make the front gap oscillate the way per-swing knockback
+           would, and enforceSpacing never undoes a backwards push. Six arrows
+           on a centred target total ~72px: a stalled wave, not a launched one. */
+        if (!u.dead) {
+          u.x = TS.clamp(u.x - u.dir * 12, TS.LAY.laneLeft, TS.LAY.laneRight);
+        }
+      }
     }
   };
 

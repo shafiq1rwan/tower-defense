@@ -474,7 +474,12 @@
   UI.volleyOverlay = function (ctx, btn, battle, armed, px, py, clock) {
     var cx = btn.x + btn.w / 2;
     var cy = btn.y + (btn.pressed ? 49 : 42);
-    TS.drawFrame(ctx, TS.SPR.arrow, 0, cx, cy, { rot: -0.85, scale: 0.85 });
+    /* SPR.arrow is anchored on its TIP (so impacts land where drawn), which is
+       wrong for an icon: centring the tip hangs the shaft off one side. At this
+       rotation and scale the ink's centre sits (-11, +12) from the tip, so the
+       draw point is offset the other way to put the ARROW's middle on the
+       button's middle. */
+    TS.drawFrame(ctx, TS.SPR.arrow, 0, cx + 11, cy - 12, { rot: -0.85, scale: 0.85 });
 
     var cd = battle.volleyCd;
     if (cd > 0) {
