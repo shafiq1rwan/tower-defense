@@ -125,6 +125,8 @@
       ptrId = e.pointerId;
       var p = toLogical(e.clientX, e.clientY);
       pointer.x = p.x; pointer.y = p.y; pointer.down = true;
+      /* Where the press began, so release() can tell a tap from a swipe. */
+      pointer.sx = p.x; pointer.sy = p.y;
       pointer.target = pick(p.x, p.y);
       if (pointer.target) pointer.target.pressed = true;
       canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
@@ -146,6 +148,22 @@
       ptrId = null;
       var p = pointer.target;
       pointer.down = false;
+      /* A horizontal swipe on the battle map turns the chapter page — checked
+         BEFORE tap activation, because a swipe that starts on a row would
+         otherwise fire that row (rows are 664px wide, plenty of room to stay
+         inside one while swiping). 70px of travel with a dominant horizontal
+         component is far past any tap jitter. Swipe left = forward, like
+         turning a page. */
+      if (screen === 'select' && !confirming && !trans) {
+        var dx = pointer.x - pointer.sx;
+        var dy = pointer.y - pointer.sy;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          if (p) { p.pressed = false; pointer.target = null; }
+          flipChapter(dx < 0 ? 1 : -1);
+          e.preventDefault();
+          return;
+        }
+      }
       if (p) {
         var still = p.pressed;
         p.pressed = false;
@@ -184,6 +202,11 @@
       if (screen !== 'battle' || paused || !battle) {
         /* Unpause is meaningful only where pause is: on the battle screen. */
         if (e.key === 'Escape' && paused && screen === 'battle') togglePause();
+        /* Arrow keys page between chapters on the map. */
+        if (screen === 'select' && !trans) {
+          if (e.key === 'ArrowLeft') { flipChapter(-1); e.preventDefault(); }
+          else if (e.key === 'ArrowRight') { flipChapter(1); e.preventDefault(); }
+        }
         return;
       }
       /* The result panel is up: its NEXT/RETRY/MAP buttons own the screen, and
@@ -425,6 +448,21 @@
     { name: 'II · THE RENEGADE MARCH', start: 8, count: 4 }
   ];
   var selChapter = -1;   // -1: derive from progress on first open
+  var chevL = null, chevR = null;   // ribbon-flank arrows, drawn in drawSelect
+
+  /* One entry point for every way of turning the page: chevron tap, swipe,
+     arrow key. Locked chapters refuse with the deny sound (swipe/keys reach
+     here; the chevron button is simply disabled instead). */
+  function flipChapter(d) {
+    var target = selChapter + d;
+    if (target < 0 || target >= CHAPTERS.length) return;
+    if (target > 0 && !TS.Save.isUnlocked(CHAPTERS[target].start)) {
+      TS.Audio.play('deny');
+      return;
+    }
+    selChapter = target;
+    goAnimated(goSelect);
+  }
 
   function goSelect() {
     screen = 'select';
@@ -455,21 +493,29 @@
         }));
       })(ch.start + i, i);
     }
+    /* Chapters turn like PAGES: chevrons flanking the ribbon, a horizontal
+       swipe anywhere on the map, or the arrow keys — not a labelled button
+       competing with BARRACKS/BACK for the bottom row. The chevron buttons are
+       kind 'none' (the shared loop skips them), drawn by drawSelect so their
+       glyphs can dim and nudge with state. */
+    chevL = new TS.UI.Button({
+      x: 4, y: 130, w: 58, h: 103, kind: 'none', id: 'chevL',
+      enabled: selChapter > 0,
+      onTap: function () { flipChapter(-1); }
+    });
+    chevR = new TS.UI.Button({
+      x: TS.W - 62, y: 130, w: 58, h: 103, kind: 'none', id: 'chevR',
+      enabled: selChapter < CHAPTERS.length - 1 && ch2open,
+      onTap: function () { flipChapter(1); }
+    });
+    buttons.push(chevL, chevR);
+
     buttons.push(new TS.UI.Button({
-      x: 40, y: 1216, w: 240, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 24,
+      x: 52, y: 1216, w: 340, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 30,
       onTap: function () { goAnimated(goShop); }
     }));
     buttons.push(new TS.UI.Button({
-      x: 296, y: 1216, w: 240, h: 130, kind: 'big',
-      label: selChapter === 0 ? 'CHAPTER II' : 'CHAPTER I', labelSize: 24,
-      enabled: ch2open,
-      onTap: function () {
-        selChapter = selChapter === 0 ? 1 : 0;
-        goAnimated(goSelect);
-      }
-    }));
-    buttons.push(new TS.UI.Button({
-      x: 552, y: 1216, w: 240, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 28,
+      x: 440, y: 1216, w: 340, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 34,
       onTap: function () { goAnimated(goTitle); }
     }));
   }
@@ -1019,6 +1065,34 @@
     UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal,
       CHAPTERS[selChapter === -1 ? 0 : selChapter].name,
       { size: 38, stroke: '#25404a' });
+
+    /* Page chevrons in the ribbon's side gutters. Drawn as outlined triangles
+       in the ribbon-text style — the icon set has no arrow glyph. A dimmed
+       chevron means "there is a page here you cannot turn to yet"; an absent
+       one means there is no page at all. */
+    function chevron(btn, dir) {
+      if (!btn) return;
+      var next = selChapter + dir;
+      if (next < 0 || next >= CHAPTERS.length) return;
+      var cx = btn.x + btn.w / 2 + (btn.pressed ? dir * 3 : 0);
+      var cy = 130 + UI.ribbonMid('big');
+      ctx.save();
+      ctx.globalAlpha = btn.enabled ? 0.9 : 0.35;
+      ctx.beginPath();
+      ctx.moveTo(cx - dir * 9, cy - 17);
+      ctx.lineTo(cx - dir * 9, cy + 17);
+      ctx.lineTo(cx + dir * 11, cy);
+      ctx.closePath();
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#25404a';
+      ctx.lineWidth = 7;
+      ctx.stroke();
+      ctx.fillStyle = '#fff8e6';
+      ctx.fill();
+      ctx.restore();
+    }
+    chevron(chevL, -1);
+    chevron(chevR, 1);
     /* Legend for the sword columns below. Sits in the gap between the ribbon and
        the first row, so it explains the swords before you scan them rather than
        after. The big ribbon art is 103px tall from y130, so it ends at 233 and the

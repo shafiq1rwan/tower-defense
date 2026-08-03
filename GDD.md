@@ -438,6 +438,7 @@ on the fourth attempt at battle 8 is how you make someone quit.
 | Arrow button / `V`, then tap the lane | Arrow volley (40g, 22s cd) |
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear / `P` / `Esc` | Pause |
+| Swipe map / `←` `→` / edge chevrons | Turn between chapters |
 | Tap anywhere (cutscene) | Advance — completes the typewriter first |
 
 Leaving a battle mid-fight asks for confirmation; a mis-tap should not throw away a run.

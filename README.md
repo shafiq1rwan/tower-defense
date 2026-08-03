@@ -31,6 +31,7 @@ worker only registers over `http`/`https`.
 | Arrow button / `V`, then tap the lane | Arrow volley — the tower rains 8 arrows there (40 gold, 22s cooldown) |
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear button / `P` / `Esc` | Pause |
+| Swipe the map / `←` `→` / edge arrows | Turn between Chapter I and II |
 
 The volley is defensive: it only reaches your own half of the lane (the aiming
 ring turns red at its limit). Use it to blunt a wave that breaks through — it
