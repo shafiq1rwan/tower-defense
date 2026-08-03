@@ -271,6 +271,26 @@
           onTap: function () { hud.volleyArmed = false; }
         };
       }
+      /* Tap your own tower to hire a MASON — a Pawn that mends the wall
+         instead of marching (see Battle.tryRepair). The tower's ground: left
+         of the gate, inside the lane band. */
+      if (x < 134 && y > TS.LAY.laneTop && y < TS.LAY.laneBot) {
+        return {
+          pressed: false,
+          contains: function (px, py) {
+            return px < 134 && py > TS.LAY.laneTop && py < TS.LAY.laneBot;
+          },
+          onTap: function () {
+            if (battle.tryRepair()) {
+              TS.Audio.play('summon');
+              hud.hint = 'REPAIRS UNDER WAY';
+              hud.hintT = 2.4;
+            } else {
+              TS.Audio.play('deny');
+            }
+          }
+        };
+      }
     }
     return TS.UI.hit(buttons, x, y);
   }
@@ -702,6 +722,12 @@
   function enterBattle() {
     screen = 'battle';
     buttons = [hud.pauseBtn, hud.speedBtn, hud.volleyBtn];
+    /* Announce the battle's challenge until it has been earned. */
+    var ch = TS.Levels.challenge(battleIndex);
+    if (ch && !(TS.Save.get().chal || {})[battleIndex]) {
+      hud.hint = 'CHALLENGE: ' + ch.text.toUpperCase();
+      hud.hintT = 4.5;
+    }
   }
 
   /* Shared by the pre-battle scenes and the epilogue. The only button is SKIP —
@@ -796,6 +822,12 @@
     resultT = 0;
     starsRung = 0;
     if (won) TS.Save.recordWin(battleIndex, hpFrac, reward);
+    if (won && TS.Levels.challengeMet(battleIndex, battle)) {
+      var sd = TS.Save.get();
+      if (!sd.chal || typeof sd.chal !== 'object') sd.chal = {};
+      sd.chal[battleIndex] = 1;
+      TS.Save.flush();
+    }
 
     var hasNext = battleIndex + 1 < TS.Levels.count;
     buttons = [];
@@ -1138,6 +1170,28 @@
       });
       ctx.restore();
 
+      /* A little gold pennant for a met challenge — prestige, not payment. */
+      if (unlocked && (TS.Save.get().chal || {})[i]) {
+        var fx = inner - 122;
+        ctx.save();
+        ctx.strokeStyle = '#3a2418';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(fx, mid - 16);
+        ctx.lineTo(fx, mid + 14);
+        ctx.stroke();
+        ctx.fillStyle = '#ffd257';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(fx, mid - 16);
+        ctx.lineTo(fx + 19, mid - 9);
+        ctx.lineTo(fx, mid - 2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.fill();
+        ctx.restore();
+      }
+
       if (unlocked) {
         var stars = TS.Save.stars(i);
         for (var s = 0; s < 3; s++) {
@@ -1161,6 +1215,12 @@
     });
     TS.text(ctx, TS.Audio.isEnabled() ? 'Sound: on' : 'Sound: off',
       TS.W / 2, d.y + 158, { size: 22, fill: '#7a6248', stroke: null });
+    var pch = TS.Levels.challenge(battleIndex);
+    if (pch) {
+      TS.text(ctx, 'Challenge: ' + pch.text, TS.W / 2, d.y + 196, {
+        size: 19, fill: '#9a7a5a', stroke: null
+      });
+    }
   }
 
   /* Three sword slots that land one at a time, so the rating is something the
@@ -1293,6 +1353,15 @@
       TS.text(ctx, starRuleText(), d.x + d.w / 2, d.y + 462, {
         size: 17, fill: '#8d775c', stroke: null
       });
+      /* The battle's challenge, judged on THIS run. */
+      var rch = TS.Levels.challenge(battleIndex);
+      if (rch) {
+        var rmet = TS.Levels.challengeMet(battleIndex, battle);
+        TS.text(ctx, (rmet ? '✓ ' : '✗ ') + rch.text,
+          d.x + d.w / 2, d.y + 430, {
+            size: 19, fill: rmet ? '#4e8a4a' : '#a56a5a', stroke: null
+          });
+      }
     }
 
     if (won) {

@@ -62,7 +62,9 @@
     Pawn: {
       name: 'Pawn', body: 62, cost: 30, hp: 70, dmg: 6, contact: 66, range: 118, speed: 62,
       cooldown: 0.9, height: 86,
-      fps: { idle: 8, run: 12, attack: 11 }, hitFrame: 2,
+      /* `repair` is the hammer strip (3 frames): a Pawn summoned by tapping the
+         tower mends it instead of fighting — see tryRepair. */
+      fps: { idle: 8, run: 12, attack: 11, repair: 6 }, hitFrame: 2,
       blurb: 'Cheap and quick. Buys you time, not damage.'
     },
     Warrior: {
@@ -774,6 +776,31 @@
     var LAY = TS.LAY;
     this.flash = Math.max(0, this.flash - dt * 6);
     if (this.sideCd > 0) this.sideCd -= dt;
+
+    /* Masons opt out of the entire soldier state machine: no walking, no
+       targeting, no attacks. They hammer until the tower is whole, then pick
+       up their knife and join the war like any other Pawn. Death still works
+       through hurt()/die(), which never consult this branch. */
+    if (this.repairing) {
+      this.animT += dt;
+      this.anim = 'repair';
+      var pc = this.battle.playerCastle;
+      this.repairT += dt;
+      while (this.repairT >= REPAIR_TICK) {
+        this.repairT -= REPAIR_TICK;
+        if (!pc.dead && pc.hp < pc.maxHp) {
+          pc.hp = Math.min(pc.maxHp, pc.hp + REPAIR_RATE * REPAIR_TICK);
+          TS.Audio.play('hammer');
+        }
+      }
+      if (pc.dead || pc.hp >= pc.maxHp) {
+        this.repairing = false;
+        this.dir = 1;
+        this.state = 'walk';
+        this.anim = 'run';
+      }
+      return;
+    }
     /* Net displacement since the last step, AFTER enforceSpacing had its say —
        a unit being towed along behind a moving line still counts as moving. */
     this.moved = (this.x - this.lastX) * this.dir;
@@ -994,6 +1021,12 @@
     this.volleyCd = 0;
     this.volleys = [];        // rains in progress, arrows still launching
     this.volleyMark = null;   // draw-only target ring, decays on the sim clock
+
+    /* War-horn wave warnings (filled by pumpWaves) and challenge bookkeeping. */
+    this.warning = null;      // { cls, n, t } — t decays on the sim clock
+    this.usedClasses = {};    // summoned classes, for 'win without X' challenges
+    this.minTowerFrac = 1;    // lowest the tower ever dipped
+    this.volleysUsed = 0;
   }
   TS.Battle = Battle;
 
@@ -1034,7 +1067,10 @@
     var groups = {}, i, k;
     for (i = 0; i < this.units.length; i++) {
       var u = this.units[i];
-      if (u.dead) continue;
+      /* Masons stand at the wall, off the marching order entirely — spacing
+         would otherwise drag them leftward every time a fresh summon spawned
+         behind their parked position. */
+      if (u.dead || u.repairing) continue;
       k = (u.isPlayer ? 'a' : 'b') + u.lane;
       (groups[k] || (groups[k] = [])).push(u);
     }
@@ -1225,6 +1261,43 @@
     this.volleyCd = VOLLEY.cooldown;
     this.volleys.push({ x: x, t: 0, fired: 0 });
     this.volleyMark = { x: x, t: 1.5 };
+    this.volleysUsed++;
+    return true;
+  };
+
+  /* Tap the tower: a Pawn is hired as a MASON instead of a soldier. Same cost
+     and the same field-cap slot, so repair is a real trade — gold and an army
+     slot converted into tower percentage, which is what the sword rating reads.
+     One mason at a time (a wall of hammering pawns reads as a bug), only while
+     there is damage to mend, and it downs tools and marches once the tower is
+     whole. Gate-safe by construction: repair adds zero damage, and a timeout
+     needs STRICTLY better castle fraction, which turtling cannot reach while
+     the enemy hut sits untouched at 100%. */
+  var REPAIR_RATE = 6;        // hp/s while hammering
+  var REPAIR_TICK = 0.5;      // one mend (and one clink) per half second
+
+  Battle.prototype.tryRepair = function () {
+    var def = UNIT_DEFS.Pawn;
+    if (this.over || this.gold < def.cost) return false;
+    var pc = this.playerCastle;
+    if (pc.dead || pc.hp >= pc.maxHp) return false;
+    if (this.isFull(true)) return false;
+    for (var i = 0; i < this.units.length; i++) {
+      var u = this.units[i];
+      if (u.repairing && !u.dead) return false;   // one mason at a time
+    }
+    this.gold -= def.cost;
+    this.stats.spent += def.cost;
+    this.usedClasses.Pawn = 1;
+    var m = this.spawn(true, 'Pawn');
+    m.repairing = true;
+    m.repairT = 0;
+    /* Stands at the gate, facing his work. dir=-1 only flips the drawing and
+       is otherwise inert here: masons never move, target or get spacing. */
+    m.x = TS.LAY.playerFrontX - 4;
+    m.dir = -1;
+    m.state = 'idle';
+    m.anim = 'repair';
     return true;
   };
 
@@ -1277,6 +1350,7 @@
     if (this.isFull(true)) return false;
     this.gold -= def.cost;
     this.stats.spent += def.cost;
+    this.usedClasses[cls] = 1;
     this.cooldowns[cls] = TS.cardCooldown(cls);
     /* Permanent upgrades bought with victory gold ride in as the spawn buff. */
     this.spawn(true, cls, TS.Save.unitBuff(cls));
@@ -1300,6 +1374,10 @@
 
     this.playerCastle.update(dt);
     this.enemyCastle.update(dt);
+    /* Challenge bookkeeping and the horn's decay, both on the sim clock. */
+    var tf = this.playerCastle.hp / this.playerCastle.maxHp;
+    if (tf < this.minTowerFrac) this.minTowerFrac = tf;
+    if (this.warning && (this.warning.t -= dt) <= 0) this.warning = null;
 
     for (i = 0; i < this.units.length; i++) this.units[i].update(dt);
     this.enforceSpacing();

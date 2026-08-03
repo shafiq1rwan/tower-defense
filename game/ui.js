@@ -560,6 +560,17 @@
     }
   };
 
+  /* What the horn announces, per class. Written as sightings, not stat lines. */
+  var WARN_TEXT = {
+    Torch: 'TORCHES APPROACHING',
+    TNT: 'DYNAMITE CREW APPROACHING',
+    Barrel: 'BARRELS INCOMING',
+    FoeArcher: 'RENEGADE ARCHERS SIGHTED',
+    FoeMonk: 'A HEALER APPROACHES',
+    FoeWarrior: 'SHIELDS ON THE ROAD',
+    FoeLancer: 'THE CAPTAIN COMES'
+  };
+
   /* ------------------------------------------------------------ battle HUD -- */
 
   function fmtTime(t) {
@@ -569,6 +580,24 @@
 
   UI.drawBattleHud = function (ctx, battle, ui, clock) {
     var save = TS.Save.get();
+
+    /* War-horn banner: pops in under the objective, fades on the sim clock so
+       the warning window shrinks honestly at 2x/3x along with the time it is
+       warning about. */
+    var wn = battle.warning;
+    if (wn && wn.t > 0 && WARN_TEXT[wn.cls]) {
+      var pop = TS.easeOutBack(Math.min(1, (3.4 - wn.t) / 0.22));
+      var label = WARN_TEXT[wn.cls] + (wn.n > 2 ? '  ×' + wn.n : '');
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, wn.t / 0.45);
+      ctx.translate(TS.W / 2, 268);
+      ctx.scale(pop, pop);
+      UI.smallRibbon(ctx, -230, -27, 460, UI.RIB.yellowR);
+      TS.text(ctx, label, 0, -27 + UI.ribbonMid('small'), {
+        size: 22, fill: '#fff3d0', stroke: '#5a4410'
+      });
+      ctx.restore();
+    }
 
     /* --- bottom panel -------------------------------------------------- */
     /* Deliberately oversized so its corner brackets and bottom rail are cropped

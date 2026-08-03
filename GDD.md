@@ -517,9 +517,13 @@ Honest list, roughly by value:
    waves and could be promoted.
 2. **Nothing teaches the central mechanic.** That only ~6 units can reach is the reason
    massing does nothing, and the game never says so.
-3. **Player agency is thin.** ~~The only input is *which card, when*.~~ Partly
-   addressed: the arrow volley (§10.1) adds a targeted, timed intervention. Still no
-   retreat or rally — a positioning verb remains the biggest agency gap.
+3. **Player agency is thin.** ~~The only input is *which card, when*.~~ Largely
+   addressed: the arrow volley (§10.1) adds a targeted intervention; the tower-tap
+   mason converts gold into tower percentage (which the sword rating reads); war
+   horns telegraph every scripted wave 4s out so preparation is a real skill; and
+   each battle carries an optional cosmetic challenge (pennant on the map — kept
+   deliberately reward-free, since every measured economy lever compounds). Still
+   no retreat or rally — a positioning verb remains the one open agency gap.
 3b. ~~Battle 8's wall is calibrated against four bot policies, not the composition
    space.~~ **Repaired.** The burn-bot exploit (4/15 fresh wins at full tower HP via
    a cheapened mix spawn-camping the hut) is closed by two shielded Renegade Blades

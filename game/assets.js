@@ -77,7 +77,9 @@
     Pawn: {
       idle: ['Pawn/Pawn_Idle Knife.png', 8],
       run: ['Pawn/Pawn_Run Knife.png', 6],
-      attack: ['Pawn/Pawn_Interact Knife.png', 4]
+      attack: ['Pawn/Pawn_Interact Knife.png', 4],
+      /* The mason's strip — measured 576x192, 3 frames. */
+      repair: ['Pawn/Pawn_Interact Hammer.png', 3]
     },
     Warrior: {
       idle: ['Warrior/Warrior_Idle.png', 8],

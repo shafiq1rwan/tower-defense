@@ -323,6 +323,25 @@
       battle.endlessI = 0;
     }
 
+    /* War horns: each scripted wave announces itself 4 seconds out, so a wave
+       is a readable decision ("barrels — spread out", "save for the Lancer")
+       instead of surprise damage. Openers under t=8 stay silent — the battle
+       has barely drawn breath — and the endless trickle never warns: it is a
+       trickle. Deterministic, straight off the script; no RNG. */
+    if (!battle.warnScript) {
+      battle.warnScript = level.waves
+        .filter(function (w) { return w.t >= 8; })
+        .map(function (w) { return { t: w.t - 4, cls: w.cls, n: w.n || 1 }; })
+        .sort(function (a, b) { return a.t - b.t; });
+      battle.warnIndex = 0;
+    }
+    while (battle.warnIndex < battle.warnScript.length &&
+           battle.warnScript[battle.warnIndex].t <= battle.time) {
+      var wn = battle.warnScript[battle.warnIndex++];
+      battle.warning = { cls: wn.cls, n: wn.n, t: 3.4 };
+      TS.Audio.play('horn');
+    }
+
     /* Due events queue rather than spawn directly, so a full field defers them
        instead of losing them — a wave's total pressure still arrives. */
     var s = battle.script;
@@ -349,6 +368,36 @@
         }
       }
     }
+  };
+
+  /* One optional CHALLENGE per battle — depth through constraint, no reward
+     but a pennant on the map. Kept as data so the checker below is the only
+     logic, and deliberately COSMETIC: every measured economy lever (bounties,
+     the free volley, the burn bot) compounded, so prestige pays nothing. */
+  var CHALLENGES = [
+    { type: 'tower', frac: 1, text: 'Take no tower damage' },
+    { type: 'lost', n: 2, text: 'Lose no more than 2 soldiers' },
+    { type: 'noclass', cls: 'Archer', text: 'Win without Archers' },
+    { type: 'noclass', cls: 'Monk', text: 'Win without a Monk' },
+    { type: 'time', t: 120, text: 'Win inside 2:00' },
+    { type: 'tower', frac: 0.8, text: 'Never drop below 80% tower' },
+    { type: 'noclass', cls: 'Lancer', text: 'Win without the Lancer' },
+    { type: 'lost', n: 8, text: 'Lose no more than 8 soldiers' },
+    { type: 'time', t: 150, text: 'Win inside 2:30' },
+    { type: 'lost', n: 5, text: 'Lose no more than 5 soldiers' },
+    { type: 'tower', frac: 0.7, text: 'Never drop below 70% tower' },
+    { type: 'novolley', text: 'Win without loosing a volley' }
+  ];
+  Levels.challenge = function (i) { return CHALLENGES[i] || null; };
+  Levels.challengeMet = function (i, battle) {
+    var c = CHALLENGES[i];
+    if (!c) return false;
+    if (c.type === 'noclass') return !battle.usedClasses[c.cls];
+    if (c.type === 'time') return battle.time <= c.t;
+    if (c.type === 'tower') return battle.minTowerFrac >= c.frac;
+    if (c.type === 'lost') return battle.stats.lost <= c.n;
+    if (c.type === 'novolley') return battle.volleysUsed === 0;
+    return false;
   };
 
   /* Gold awarded for a win, scaled by how intact your castle is. */

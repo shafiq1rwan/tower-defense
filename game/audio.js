@@ -183,6 +183,16 @@
     click: function () {
       tone({ type: 'square', f0: 820, f1: 620, dur: 0.05, gain: 0.12 });
     },
+    /* Two rising fifths, brassy sawtooth: the war horn before a scripted wave. */
+    horn: function () {
+      tone({ type: 'sawtooth', f0: 147, dur: 0.22, gain: 0.16, q: 0.8 });
+      tone({ type: 'sawtooth', f0: 220, dur: 0.34, gain: 0.14, delay: 0.18 });
+    },
+    /* The mason's clink: short, woody, unobtrusive at one per half second. */
+    hammer: function () {
+      noise({ f0: 2100, f1: 900, dur: 0.05, gain: 0.09, q: 1.6 });
+      tone({ type: 'triangle', f0: 660, f1: 500, dur: 0.05, gain: 0.06 });
+    },
     deny: function () {
       tone({ type: 'square', f0: 300, f1: 190, dur: 0.12, gain: 0.13 });
     },
@@ -201,7 +211,8 @@
   /* Minimum gap per voice, in ms. */
   var THROTTLE = {
     swing: 55, hit: 45, bow: 70, die: 90, heal: 120,
-    summon: 40, coin: 60, castleHit: 110, click: 30, deny: 160
+    summon: 40, coin: 60, castleHit: 110, click: 30, deny: 160,
+    horn: 900, hammer: 380
   };
 
   Audio.play = function (name) {

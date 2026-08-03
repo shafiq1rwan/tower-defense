@@ -32,6 +32,13 @@ worker only registers over `http`/`https`.
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear button / `P` / `Esc` | Pause |
 | Swipe the map / `←` `→` / edge arrows | Turn between Chapter I and II |
+| Tap your tower | Hire a mason — a Pawn that repairs the tower (30 gold, one at a time), then joins the war when it's whole |
+
+A war horn sounds four seconds before every scripted wave, naming what's coming —
+barrels mean spread out, the Captain means start saving. And every battle carries an
+optional **challenge** ("win without the Lancer", "never drop below 80%") worth a
+gold pennant on the map. Repairs matter because the sword rating reads your tower's
+health: gold spent on the mason is gold converted into rating.
 
 The volley is defensive: it only reaches your own half of the lane (the aiming
 ring turns red at its limit). Use it to blunt a wave that breaks through — it

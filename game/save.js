@@ -16,6 +16,7 @@
     best: {},          // battleIndex -> best remaining castle HP %
     upg: {},           // class name -> upgrade level 0..MAX_UPG
     story: {},         // cutscene key -> 1 once watched, so it never repeats
+    chal: {},          // battleIndex -> 1 once its challenge is met
     muted: false
   };
 
