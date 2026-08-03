@@ -1,6 +1,6 @@
 /* story.js — the campaign's cutscenes.
  *
- * Nine short scenes: one before each battle, one after the last is won. They play
+ * Thirteen short scenes: one before each battle, one after the last is won. They play
  * over the LEVEL'S OWN backdrop, because startBattle builds the terrain and scene
  * before handing control here — so the battle-4 scene is rained on and the
  * battle-8 scene is lit by embers, at no extra cost.
@@ -26,7 +26,10 @@
   var CAST = {
     aldric: { name: 'Captain Aldric', cls: 'Warrior', ink: [22, 218, 31, 212] },
     fen: { name: 'Brother Fen', cls: 'Monk', ink: [57, 200, 44, 198] },
-    grix: { name: 'Grix', goblin: 'Torch' }
+    grix: { name: 'Grix', goblin: 'Torch' },
+    /* Chapter 2's voice on the other side: the purple colourway's Warrior
+       portrait, same pose as Aldric's — deliberately, they are mirrors. */
+    vael: { name: 'Ser Vael', cls: 'Warrior', team: 'Purple', ink: [22, 218, 32, 212] }
   };
 
   /* Avatars draw at NATIVE size, as the result panel does. Doubling them fills
@@ -83,11 +86,39 @@
       ['fen', 'And the shafts beneath it?'],
       ['aldric', 'Especially the shafts.']
     ],
-    end: [
-      ['fen', 'It’s done. The camp is ash.'],
-      ['aldric', 'The tunnels go deeper than the camp did.'],
-      ['fen', 'How much deeper?'],
-      ['aldric', 'Post a watch. Every night.']
+    /* ---- Chapter 2: The Renegade March. The old post-camp epilogue is folded
+       into this scene — with twelve battles it could never fire on its own. */
+    8: [
+      ['fen', 'The camp is ash. But the tunnels go deeper than the camp did.'],
+      ['aldric', 'How much deeper?'],
+      ['fen', 'The watch stopped measuring. And Captain — banners. North road.'],
+      ['aldric', 'Goblins don’t carry banners.'],
+      ['vael', 'No. We took ours back.']
+    ],
+    9: [
+      ['grix', 'The big one walks in front. He does not hurry.'],
+      ['fen', 'Why would he? Nothing has ever made him.'],
+      ['aldric', 'Then we will be the first.']
+    ],
+    10: [
+      ['vael', 'Give up the meadow, Captain. You don’t know what it sits on.'],
+      ['aldric', 'I know your king wants it. Reason enough to keep it.'],
+      ['grix', 'We dug where he told us. Then we heard it breathe. We ran.'],
+      ['fen', 'Captain.'],
+      ['aldric', 'Hold the line.']
+    ],
+    11: [
+      ['fen', 'If we break them here, it ends.'],
+      ['aldric', 'And the thing below?'],
+      ['grix', 'It sleeps, if nobody knocks. His king means to knock.'],
+      ['aldric', 'Then today we take away his knuckles.']
+    ],
+    finale: [
+      ['vael', 'He would have opened it. You know that.'],
+      ['aldric', 'And you marched for him anyway.'],
+      ['vael', 'Men follow the man who pays. You taught us better. Briefly.'],
+      ['fen', 'The shafts are sealed. Stone, salt, and a prayer.'],
+      ['aldric', 'Post the watch anyway. Every night.']
     ]
   };
 
@@ -199,7 +230,7 @@
       TS.drawFrame(ctx, spr, (clock * 8) | 0, px, PORTRAIT_BASE,
         { scale: GOBLIN_SCALE, flip: true });
     } else {
-      var img = TS.img(TS.avatarKey('Blue', actor.cls));
+      var img = TS.img(TS.avatarKey(actor.team || 'Blue', actor.cls));
       if (img) {
         var k = AVATAR_SCALE, ink = actor.ink;
         /* Line the ink's bottom up with the baseline and its middle with centre. */

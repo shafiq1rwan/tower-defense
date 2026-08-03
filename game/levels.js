@@ -1,4 +1,4 @@
-/* levels.js — the eight battles.
+/* levels.js — the twelve battles, in two chapters.
  *
  * Waves are a declarative timed script rather than a gold-budget AI, so the
  * difficulty curve is directly authorable and a battle plays the same way twice.
@@ -23,6 +23,9 @@
      a non-purchasable class into every level's card list, which showed up in game as
      a summon card costing 'undefined'. */
   var RA = 'FoeArcher', RH = 'FoeMonk';
+  /* Chapter 2: the renegades march under their own banner. RW = armoured blade
+     that guards, RL = the slow heavy captain. */
+  var RW = 'FoeWarrior', RL = 'FoeLancer';
 
   /* `buff` multiplies enemy HP and damage. It stays low deliberately: the enemy
      already gets free units, so a large multiplier on top makes late battles
@@ -163,9 +166,18 @@
       startGold: 280, goldRate: 24, goldCap: 700,
       buff: 1.15,
       timeLimit: 260,
+      /* The early RW pair is the WALL REPAIR. Measured: a balanced bot whose
+         gold was merely burned 40/22s beat this battle fresh 4/15 at full tower
+         HP — the burn skews purchases cheaper and that mix spawn-camped the hut
+         before the t44+ waves arrived. Two 150hp shielded Blades guarding the
+         camp's opening close that window (burn/zero-damage-volley bots back to
+         0/15). A first draft also added a second barrel wave at t38; that
+         overshot the other way — MAXED balanced fell to 6/10, and the gate is
+         supposed to open, not wobble. */
       waves: [
         { t: 2, cls: T, n: 6, gap: 0.35 },
         { t: 16, cls: N, n: 3, gap: 0.8 },
+        { t: 22, cls: RW, n: 2, gap: 1.5 },
         { t: 30, cls: B, n: 2, gap: 1.5 },
         { t: 44, cls: T, n: 6, gap: 0.35 },
         { t: 60, cls: N, n: 3, gap: 0.8 },
@@ -174,7 +186,110 @@
         { t: 84, cls: RH, n: 2, gap: 1.6 },
         { t: 92, cls: T, n: 3, gap: 0.3 }
       ],
-      endless: { every: 8.5, cap: 6, classes: [T, N, B, RA, N, T, RH] }
+      endless: { every: 8.5, cap: 6, classes: [T, N, B, RA, RW, T, RH] }
+    },
+
+    /* ---- Chapter 2: The Renegade March --------------------------------- */
+    /* Tuned for an UPGRADED army. These sit behind the battle-8 gate, so a
+       player arriving here has real Barracks levels — fresh-save losses are
+       expected and correct, the same way battle 8's are. */
+    /* Chapter-2 economy stays at battle-8 levels DELIBERATELY. The first draft
+       scaled startGold to 300-360 and every fresh bot swept the chapter at
+       full tower HP — a richer player out-produces any script that has not
+       arrived yet. Difficulty here comes from the waves, never the wallet. And
+       the waves are FRONT-LOADED: the measured failure of battles 1-7 is that
+       battles end at 28-43s while scripts run to t=60-92, so chapter 2 puts
+       its shields on the field in the opening seconds. */
+    {
+      name: 'Broken Oaths',
+      objective: 'Rout the renegade vanguard',
+      cards: [P, W, A, M, L],
+      playerHp: 540, enemyHp: 760,
+      startGold: 240, goldRate: 22, goldCap: 700,
+      buff: 1.12,
+      timeLimit: 270,
+      waves: [
+        { t: 2, cls: RW, n: 2, gap: 1.3 },
+        { t: 6, cls: T, n: 4, gap: 0.4 },
+        { t: 14, cls: RA, n: 2, gap: 1.2 },
+        { t: 22, cls: RW, n: 2, gap: 1.3 },
+        { t: 30, cls: N, n: 2, gap: 0.9 },
+        { t: 38, cls: RW, n: 2, gap: 1.2 },
+        { t: 46, cls: RH, n: 1 },
+        { t: 54, cls: T, n: 4, gap: 0.35 },
+        { t: 62, cls: RW, n: 2, gap: 1.2 },
+        { t: 72, cls: RA, n: 2, gap: 1.1 }
+      ],
+      endless: { every: 8, cap: 6, classes: [RW, T, RA, RW, N] }
+    },
+    {
+      name: "The Captain's Column",
+      objective: 'Bring down the Renegade Captain',
+      cards: [P, W, A, M, L],
+      playerHp: 560, enemyHp: 800,
+      startGold: 250, goldRate: 23, goldCap: 720,
+      buff: 1.14,
+      timeLimit: 280,
+      waves: [
+        { t: 2, cls: RW, n: 2, gap: 1.3 },
+        { t: 8, cls: T, n: 4, gap: 0.4 },
+        { t: 16, cls: RL, n: 1 },
+        { t: 24, cls: RA, n: 2, gap: 1.2 },
+        { t: 32, cls: RH, n: 1 },
+        { t: 40, cls: RW, n: 2, gap: 1.3 },
+        { t: 50, cls: N, n: 2, gap: 0.9 },
+        { t: 58, cls: RL, n: 1 },
+        { t: 68, cls: RW, n: 2, gap: 1.2 },
+        { t: 78, cls: T, n: 4, gap: 0.35 }
+      ],
+      endless: { every: 8, cap: 6, classes: [RW, T, RA, N, RW, RH] }
+    },
+    {
+      name: 'Ashes on the Wind',
+      objective: 'Weather the combined assault',
+      cards: [P, W, A, M, L],
+      playerHp: 580, enemyHp: 850,
+      startGold: 260, goldRate: 23, goldCap: 740,
+      buff: 1.17,
+      timeLimit: 290,
+      waves: [
+        { t: 2, cls: T, n: 5, gap: 0.35 },
+        { t: 7, cls: RW, n: 2, gap: 1.3 },
+        { t: 14, cls: B, n: 2, gap: 1.5 },
+        { t: 20, cls: RA, n: 2, gap: 1.1 },
+        { t: 28, cls: RL, n: 1 },
+        { t: 36, cls: RH, n: 2, gap: 1.5 },
+        { t: 44, cls: N, n: 3, gap: 0.8 },
+        { t: 52, cls: RW, n: 3, gap: 1.2 },
+        { t: 62, cls: RL, n: 1 },
+        { t: 72, cls: B, n: 2, gap: 1.4 },
+        { t: 80, cls: RW, n: 2, gap: 1.2 }
+      ],
+      endless: { every: 7.5, cap: 7, classes: [RW, N, RA, T, RL, RH, B] }
+    },
+    {
+      name: 'The Renegade King',
+      objective: 'End the march for good',
+      cards: [P, W, A, M, L],
+      playerHp: 600, enemyHp: 900,
+      startGold: 270, goldRate: 24, goldCap: 760,
+      buff: 1.2,
+      timeLimit: 300,
+      waves: [
+        { t: 2, cls: RW, n: 3, gap: 1.2 },
+        { t: 8, cls: T, n: 5, gap: 0.35 },
+        { t: 15, cls: RA, n: 2, gap: 1.1 },
+        { t: 22, cls: RL, n: 1 },
+        { t: 30, cls: RH, n: 2, gap: 1.5 },
+        { t: 38, cls: B, n: 3, gap: 1.3 },
+        { t: 46, cls: RW, n: 3, gap: 1.1 },
+        { t: 56, cls: RL, n: 2, gap: 2.4 },
+        { t: 68, cls: N, n: 3, gap: 0.8 },
+        { t: 78, cls: RH, n: 2, gap: 1.4 },
+        { t: 86, cls: T, n: 4, gap: 0.3 },
+        { t: 94, cls: RL, n: 1 }
+      ],
+      endless: { every: 7, cap: 7, classes: [RW, RA, RL, T, N, RH, RW, B] }
     }
   ];
 

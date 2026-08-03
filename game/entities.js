@@ -172,6 +172,29 @@
       fps: { idle: 8, run: 10, attack: 12 }, hitFrame: 6
     },
 
+    /* Chapter 2's front line: a Warrior in purple, tuned a step BELOW the
+       player's own (150/17 vs 185/21) so the mirror match rewards upgrades
+       rather than stonewalling them. Same contact/range as the player Warrior,
+       so the two-rank arithmetic is already proven: 78+46=124 < 130 < 170. */
+    FoeWarrior: {
+      name: 'Renegade Blade', body: 79, enemy: true,
+      hp: 150, dmg: 17, contact: 78, range: 130, speed: 44,
+      cooldown: 1.05, height: 92, guard: true, twoSwings: true,
+      fps: { idle: 8, run: 11, attack: 12, attack2: 12, guard: 12 }, hitFrame: 2
+    },
+
+    /* The heavy. Slow enough to be seen coming, tough enough that ignoring it
+       loses the front line. Player Lancer's geometry (104+46=150 < 160 < 196),
+       more hp, less dmg — it should be a WALL that grinds, not an assassin:
+       36 every 1.6s is 22.5 dps, under two player Warriors' answer, so the
+       counter is to focus it down, not to out-trade it one-on-one. */
+    FoeLancer: {
+      name: 'Renegade Captain', body: 69, enemy: true,
+      hp: 420, dmg: 36, contact: 104, range: 160, speed: 30,
+      cooldown: 1.6, height: 96, guard: true,
+      fps: { idle: 9, run: 10, attack: 9, guard: 11 }, hitFrame: 1
+    },
+
     /* A rolling keg: quick, fragile, and detonates on contact instead of
        attacking. Kill it at range or it takes the front rank with it. */
     Barrel: {
@@ -335,15 +358,24 @@
     this.target = o.target;
     this.spr = o.spr;
     this.aoe = o.aoe || 0;
+    this.strike = o.strike || 0;   // volley: damage radius around the landing point
     this.spin = !!o.spin;
     this.speed = o.speed || ARROW_SPEED;
     this.dead = false;
     this.anim = 0;
     this.rot = 0;
 
-    var t = o.target;
-    var tx = t.x;
-    var ty = (t.feetY || t.y) - (t.def ? t.def.height * 0.55 : 90);
+    /* `at` is a fixed landing POINT (the volley); `target` is a thing with a
+       chest height to aim for (every other shot in the game). */
+    var tx, ty;
+    if (o.at) {
+      tx = o.at.x;
+      ty = o.at.y;
+    } else {
+      var t = o.target;
+      tx = t.x;
+      ty = (t.feetY || t.y) - (t.def ? t.def.height * 0.55 : 90);
+    }
     var dx = tx - o.x, dy = ty - o.y;
     var dist = Math.max(40, Math.hypot(dx, dy));
     this.T = dist / this.speed;
@@ -364,7 +396,12 @@
 
     if (this.t >= this.T) {
       this.dead = true;
-      if (this.aoe) {
+      if (this.strike) {
+        /* Volley arrow: damages whatever stands near its LANDING POINT — it was
+           never homing on a unit, so there is no target to miss. */
+        battle.volleyStrike(this.x, this.strike, this.dmg);
+        TS.FX.dust(this.x, this.y + 4, { scale: 0.45 });
+      } else if (this.aoe) {
         battle.detonate(this.x, this.y, this.aoe, this.dmg, this.fromPlayer, false);
       } else {
         var t = this.target;
@@ -952,6 +989,11 @@
     this.nextLane = 0;
     this.cooldowns = {};
     TS.CLASSES.forEach(function (c) { this.cooldowns[c] = 0; }, this);
+
+    /* Arrow volley — the player's one active ability. */
+    this.volleyCd = 0;
+    this.volleys = [];        // rains in progress, arrows still launching
+    this.volleyMark = null;   // draw-only target ring, decays on the sim clock
   }
   TS.Battle = Battle;
 
@@ -1103,7 +1145,11 @@
      to 0 wins in 8 fresh attempts. Re-sweep after ANY change here. */
   /* The renegade knights are worth more than a Torch: the archer has to be shot
      off its perch and the monk has to be picked out of a line. */
-  var BOUNTY = { Torch: 7, TNT: 20, Barrel: 7, FoeArcher: 16, FoeMonk: 18 };
+  /* The chapter-2 knights pay as elites — the Blade is a slog to chew through
+     and the Captain is a battle in itself — but the TNT keeps the single
+     biggest bounty: reachability, not toughness, is what a bounty rewards. */
+  var BOUNTY = { Torch: 7, TNT: 20, Barrel: 7, FoeArcher: 16, FoeMonk: 18,
+    FoeWarrior: 12, FoeLancer: 18 };
   var GOLD_RATE_MUL = 0.90;
 
   Battle.prototype.bounty = function (unit) {
@@ -1116,6 +1162,110 @@
     var purse = TS.UI.PURSE;
     TS.FX.coin(unit.x, unit.feetY - 30, amount, purse.x, purse.y);
     this.goldPulse = 1;
+  };
+
+  /* ---------------------------------------------------------- arrow volley -- */
+
+  /* The player's one ACTIVE ability: tap the lane, the tower rains eight arrows
+     there. It exists to give the player an AoE answer — the reach cap means only
+     ~2 units a side actually swing at once, so raw numbers cannot clear a clump,
+     and the enemy backline (TNT, the renegades) is otherwise the player's
+     hardest reach.
+
+     Sized as a SNIPE, not a nuke: the spread is ±30 and each arrow strikes 26px,
+     so a unit at the centre of a well-aimed volley takes 6 arrows (96) — enough
+     to kill a TNT goblin (76-88 hp across the buff curve) but under half a
+     Warrior's contribution per 20s cooldown (~4.8 single-target DPS averaged).
+
+     Two hard rules. The spread offsets are FIXED arrays, not rolls — the sim
+     must stay off Math.random. And volleyStrike never touches the enemy castle:
+     free damage from absolute safety would bypass the two-rank model entirely
+     and let a fresh save shell battle 8's hut down from the far side of the
+     lane. The bots in the balance sweep exercise this on-cooldown (aimed at the
+     deepest enemy) and battle 8 must stay unwinnable fresh. */
+  var VOLLEY = {
+    arrows: 8,
+    dmg: 16,
+    radius: 26,
+    cooldown: 22,
+    cost: 40,
+    reach: 460,      // fixed line: the tower covers ITS OWN half, and no more
+    stagger: 0.07,   // seconds between launches; flight time supplies the delay
+    spreadX: [-30, 10, -15, 27, 3, -21, 18, -9],
+    spreadRow: [1, 0, 2, 1, 0, 2, 0, 1]
+  };
+  TS.VOLLEY = VOLLEY;   // the HUD badge reads cooldown/cost/reach from here
+
+  /* The volley is DEFENSIVE — a fixed reach line just past mid-lane — and that
+     is the design's load-bearing wall, learned across four failed offensive
+     versions. Every offensive variant cracked the battle-8 gate, and each
+     "nerf" made it WORSE (free dmg16/cd20: fresh B8 fell 1/16; +40g cost:
+     4/15; dmg14/cd26: 6/15; reach tied to your front line: 9/15, some at FULL
+     tower HP). Two mechanisms, both structural: a deep volley SUPPRESSES the
+     TNT artillery, whose lob is the sole counter to a massed player back line;
+     and at the field cap the army is full, gold sits clipped at goldCap, so
+     any wallet-priced ability converts WASTED income into damage — at the cap
+     a 40g volley is literally free, which is why pricing it helped nothing.
+     A front-relative reach failed too, because a winning line parks at the
+     enemy camp and drags the reach line with it. Only a FIXED line is safe:
+     defence cannot fund a push by construction. Goblins on your half — a
+     break-in, a Barrel roll, a Torch wave mid-lane — are fair targets; the
+     enemy's half might as well be another country. Sweep the abuse bot after
+     ANY change here. */
+  Battle.prototype.volleyReach = function () {
+    return VOLLEY.reach;
+  };
+
+  Battle.prototype.castVolley = function (x) {
+    if (this.over || this.volleyCd > 0 || this.gold < VOLLEY.cost) return false;
+    this.gold -= VOLLEY.cost;
+    this.stats.spent += VOLLEY.cost;
+    x = TS.clamp(x, TS.LAY.laneLeft + 34,
+      Math.min(TS.LAY.laneRight - 34, this.volleyReach()));
+    this.volleyCd = VOLLEY.cooldown;
+    this.volleys.push({ x: x, t: 0, fired: 0 });
+    this.volleyMark = { x: x, t: 1.5 };
+    return true;
+  };
+
+  /* Damage near a landing point — UNITS only, and only the enemy's (the volley
+     is player-only). Depth rows are a drawing device, so distance is x alone,
+     the same rule detonate follows. */
+  Battle.prototype.volleyStrike = function (x, radius, dmg) {
+    for (var i = 0; i < this.units.length; i++) {
+      var u = this.units[i];
+      if (u.dead || u.isPlayer) continue;
+      if (Math.abs(u.x - x) <= radius) u.hurt(dmg, null);
+    }
+  };
+
+  Battle.prototype.updateVolleys = function (dt) {
+    if (this.volleyCd > 0 && !this.over) {
+      this.volleyCd = Math.max(0, this.volleyCd - dt);
+    }
+    if (this.volleyMark && (this.volleyMark.t -= dt) <= 0) this.volleyMark = null;
+    for (var i = this.volleys.length - 1; i >= 0; i--) {
+      var v = this.volleys[i];
+      v.t += dt;
+      while (v.fired < VOLLEY.arrows && v.t >= v.fired * VOLLEY.stagger) {
+        var pc = this.playerCastle;
+        this.projectiles.push(new Projectile({
+          fromPlayer: true,
+          /* Loosed from the tower's crown, so the arc reads as the tower
+             itself answering. */
+          x: pc.x + 14,
+          y: pc.y - 205,
+          at: { x: v.x + VOLLEY.spreadX[v.fired],
+                y: TS.LAY.lanes[VOLLEY.spreadRow[v.fired]] },
+          dmg: VOLLEY.dmg,
+          strike: VOLLEY.radius,
+          spr: TS.SPR.arrow
+        }));
+        TS.Audio.play('bow');
+        v.fired++;
+      }
+      if (v.fired >= VOLLEY.arrows) this.volleys.splice(i, 1);
+    }
   };
 
   /* Player summon: checks affordability, per-card cooldown and the field cap. */
@@ -1153,6 +1303,9 @@
 
     for (i = 0; i < this.units.length; i++) this.units[i].update(dt);
     this.enforceSpacing();
+    /* Outside the !over gate, like projectiles: a rain already in the air still
+       lands while the victory banner unrolls. Only the COOLDOWN stops ticking. */
+    this.updateVolleys(dt);
     for (i = 0; i < this.projectiles.length; i++) this.projectiles[i].update(dt, this);
 
     /* Reap: dying units linger for their fade, arrows vanish on impact. */
@@ -1243,6 +1396,27 @@
     behindEnemy.sort(byDepth);
     frontEnemy.sort(byDepth);
     field.sort(byDepth);
+
+    /* Where the volley will land: a ring on the sand, under everything that
+       walks. Draw-only — its timer decays on the sim clock in updateVolleys, so
+       it reads the same at 1x and 3x, like goldPulse. */
+    if (this.volleyMark) {
+      var vm = this.volleyMark;
+      ctx.save();
+      ctx.globalAlpha = 0.4 + 0.25 * Math.sin(vm.t * 14);
+      /* Dark understroke first: gold alone vanishes against the sand. */
+      ctx.strokeStyle = '#2a1c10';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(vm.x, TS.LAY.lanes[1] + 6, 58, 22, 0, 0, 6.2832);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffd257';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(vm.x, TS.LAY.lanes[1] + 6, 58, 22, 0, 0, 6.2832);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     /* Ground dust sits behind the buildings too, or spawn puffs smear across
        the castle walls. */

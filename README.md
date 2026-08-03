@@ -28,8 +28,13 @@ worker only registers over `http`/`https`.
 |---|---|
 | Tap / click a card | Summon that unit (costs gold, then the card recharges) |
 | `1`–`5` | Summon by card slot |
+| Arrow button / `V`, then tap the lane | Arrow volley — the tower rains 8 arrows there (40 gold, 22s cooldown) |
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear button / `P` / `Esc` | Pause |
+
+The volley is defensive: it only reaches your own half of the lane (the aiming
+ring turns red at its limit). Use it to blunt a wave that breaks through — it
+cannot shell the goblin camp.
 
 Burn down the goblin hut before the clock runs out. If time expires, whichever
 base is in better shape wins. Your army is capped at 8 on the field, so slots are
@@ -62,9 +67,13 @@ so the smaller cap costs no difficulty and every unit you buy is one that fights
 | Barrel Bomb | A fast rolling keg that detonates on contact. Kill it at range or it takes your front rank with it |
 | Renegade Archer | A knight fighting for the wrong side. Shoots your front rank from beyond sword reach — your own archers can answer it, your swords cannot |
 | Renegade Monk | Heals the goblin line. The first enemy that asks you to choose a target instead of just hitting the nearest thing |
+| Renegade Blade | Chapter 2's front line — an armoured warrior that blocks behind its shield. Chew through it or go around, it will not hurry |
+| Renegade Captain | The heavy. Slow, brutal, strikes lance-length from behind its own line. Focus it down before it grinds yours away |
 
 The renegades arrive from battle 5 and are the pack's purple colourway, so the three
-sides stay readable at a glance: blue is yours, red is the horde, purple is hired.
+sides stay readable at a glance: blue is yours, red is the horde, purple is hired —
+until chapter 2 (battles 9-12), when the purple knights stop being hired and march
+under their own banner.
 
 Spamming one card will not carry you. Pawns alone stop working almost immediately,
 and massing Archers behind a wall — the strongest-looking play, since they kill from
@@ -87,7 +96,7 @@ it keeps real time when you fast-forward rather than speeding up with the battle
 
 ### Every battle is a different place
 
-The eight battles do not share a backdrop. Each has a **theme** (`game/themes.js`)
+The twelve battles do not share a backdrop. Each has a **theme** (`game/themes.js`)
 setting its ground palette, weather, water and how much wildlife is about, and the
 campaign darkens as it escalates:
 
@@ -120,7 +129,7 @@ Winning a battle pays out gold, scaled by how intact your tower is. Spend it in 
 class, each worth **+12% health and power**, so a fully trained class is +36%.
 
 Costs are 120 / 260 / 520 per level, or 900 to max one class and 4,500 to max all
-five. A flawless run of all eight battles banks about **1,416** gold — enough for a
+five. A flawless run of chapter 1's eight battles banks about **1,416** gold — enough for a
 meaningful slice, not the lot, so which classes you invest in is a real choice.
 Replaying a battle pays out again, which is the reason to go back for three swords.
 
@@ -151,7 +160,7 @@ game/
   scene.js          animated scenery and cloud drift
   fx.js             particles, floating numbers, screen shake
   entities.js       unit stats, combat, bases, projectiles
-  levels.js         the eight battle scripts
+  levels.js         the twelve battle scripts
   ui.js             HUD, summon cards, panels, dialogs
   game.js           canvas scaling, fixed-step loop, screens, input
 ```

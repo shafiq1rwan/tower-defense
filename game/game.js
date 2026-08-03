@@ -196,6 +196,9 @@
       } else if (e.code === 'Space') {
         cycleSpeed();
         e.preventDefault();
+      } else if (e.key === 'v' || e.key === 'V') {
+        hud.volleyBtn.onTap();
+        e.preventDefault();
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
         togglePause();
         e.preventDefault();
@@ -214,6 +217,37 @@
       for (var i = 0; i < hud.cards.length; i++) {
         if (hud.cards[i].contains(x, y)) return hud.cards[i];
       }
+      /* Armed volley: HUD buttons still work (and the volley button un-arms),
+         but a tap anywhere near the lane is the shot. contains() tracks the
+         moving finger, so the volley fires where the finger is RELEASED —
+         drag-to-aim for free — and dragging out of the band cancels. */
+      if (hud.volleyArmed) {
+        var b = TS.UI.hit(buttons, x, y);
+        if (b) return b;
+        var LAY = TS.LAY;
+        var inBand = function (px, py) {
+          return py > LAY.laneTop - 70 && py < LAY.laneBot + 70;
+        };
+        /* The band check must happen HERE: contains() is only re-consulted when
+           the pointer moves, so a motionless tap outside the lane would
+           otherwise still fire (clamped), from the top HUD of all places. */
+        if (inBand(x, y)) {
+          return {
+            pressed: false,
+            contains: inBand,
+            onTap: function () {
+              hud.volleyArmed = false;
+              if (battle && battle.castVolley(pointer.x)) TS.Audio.play('click');
+            }
+          };
+        }
+        /* A tap anywhere else stands down. */
+        return {
+          pressed: false,
+          contains: function () { return true; },
+          onTap: function () { hud.volleyArmed = false; }
+        };
+      }
     }
     return TS.UI.hit(buttons, x, y);
   }
@@ -225,6 +259,7 @@
 
   function tapCard(card) {
     if (!battle || battle.over || paused) return;
+    hud.volleyArmed = false;
     if (battle.trySummon(card.cls)) {
       card.flashT = 0.28;
       hud.hint = card.def.blurb;
@@ -382,35 +417,59 @@
     });
   }
 
+  /* Twelve battles no longer fit one screen of 103px ribbons, so the map is two
+     CHAPTERS — which the campaign's story structure wanted anyway. `selChapter`
+     persists across visits within a session; chapter 2 unlocks with battle 9. */
+  var CHAPTERS = [
+    { name: 'I · THE GOBLIN WAR', start: 0, count: 8 },
+    { name: 'II · THE RENEGADE MARCH', start: 8, count: 4 }
+  ];
+  var selChapter = -1;   // -1: derive from progress on first open
+
   function goSelect() {
     screen = 'select';
     /* Same teardown as goTitle. MAP in the quit confirm lands here from a PAUSED
        battle, and a leaked `paused` was fatal: Escape's unpause fallback then
        rebuilt the 2-button battle HUD set on this screen, and drawSelectRows
-       indexes buttons[0..7] — TypeError, dead rAF loop, frozen game. */
+       indexes the row buttons — TypeError, dead rAF loop, frozen game. */
     paused = false;
     confirming = null;
     battle = null;
     stopMusic();
     useDefaultBackdrop();
+
+    var ch2open = TS.Save.isUnlocked(CHAPTERS[1].start);
+    if (selChapter === -1) selChapter = ch2open ? 1 : 0;
+    if (selChapter === 1 && !ch2open) selChapter = 0;
+    var ch = CHAPTERS[selChapter];
+
+    /* Row buttons FIRST — drawSelectRows pairs rows with buttons[0..count-1]. */
     buttons = [];
-    var n = TS.Levels.count;
-    for (var i = 0; i < n; i++) {
-      (function (idx) {
+    for (var i = 0; i < ch.count; i++) {
+      (function (idx, slot) {
         var unlocked = TS.Save.isUnlocked(idx);
         buttons.push(new TS.UI.Button({
-          x: 84, y: SELECT_TOP + idx * SELECT_PITCH, w: 664, h: 103,
+          x: 84, y: SELECT_TOP + slot * SELECT_PITCH, w: 664, h: 103,
           kind: 'none', id: 'lvl' + idx, enabled: unlocked,
           onTap: function () { startBattle(idx); }
         }));
-      })(i);
+      })(ch.start + i, i);
     }
     buttons.push(new TS.UI.Button({
-      x: 52, y: 1216, w: 340, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 30,
+      x: 40, y: 1216, w: 240, h: 130, kind: 'big', label: 'BARRACKS', labelSize: 24,
       onTap: function () { goAnimated(goShop); }
     }));
     buttons.push(new TS.UI.Button({
-      x: 440, y: 1216, w: 340, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 34,
+      x: 296, y: 1216, w: 240, h: 130, kind: 'big',
+      label: selChapter === 0 ? 'CHAPTER II' : 'CHAPTER I', labelSize: 24,
+      enabled: ch2open,
+      onTap: function () {
+        selChapter = selChapter === 0 ? 1 : 0;
+        goAnimated(goSelect);
+      }
+    }));
+    buttons.push(new TS.UI.Button({
+      x: 552, y: 1216, w: 240, h: 130, kind: 'bigRed', label: 'BACK', labelSize: 28,
       onTap: function () { goAnimated(goTitle); }
     }));
   }
@@ -563,7 +622,24 @@
       }),
       speedBtn: new TS.UI.Button({
         x: 34, y: 145, kind: 'rndBlue', label: '1x', labelSize: 30, onTap: cycleSpeed
-      })
+      }),
+      /* The volley: tap to ARM, then tap the lane to loose it. Arming is pure
+         UI state on the hud — the sim only ever hears the final castVolley. */
+      /* Below the speed button, low enough that its ready-ring clears the
+         timer text drawn under the speed button at ~y256. */
+      volleyBtn: new TS.UI.Button({
+        x: 34, y: 280, kind: 'rndBlue', id: 'volley',
+        onTap: function () {
+          if (!battle || battle.over) return;
+          if (battle.volleyCd > 0 || battle.gold < TS.VOLLEY.cost) {
+            TS.Audio.play('deny');
+            hud.volleyArmed = false;
+            return;
+          }
+          hud.volleyArmed = !hud.volleyArmed;
+        }
+      }),
+      volleyArmed: false
     };
 
     /* The battle is fully built — hud included — before its cutscene runs, which
@@ -579,7 +655,7 @@
 
   function enterBattle() {
     screen = 'battle';
-    buttons = [hud.pauseBtn, hud.speedBtn];
+    buttons = [hud.pauseBtn, hud.speedBtn, hud.volleyBtn];
   }
 
   /* Shared by the pre-battle scenes and the epilogue. The only button is SKIP —
@@ -639,7 +715,8 @@
        restarting the loop from bar one every time the player checks the menu. */
     if (paused) TS.Audio.Music.suspend(); else TS.Audio.Music.resume();
     confirming = null;
-    buttons = paused ? pauseButtons() : [hud.pauseBtn, hud.speedBtn];
+    hud.volleyArmed = false;
+    buttons = paused ? pauseButtons() : [hud.pauseBtn, hud.speedBtn, hud.volleyBtn];
   }
 
   /* Leaving mid-battle used to be a single unguarded tap on MAP, which threw away
@@ -690,8 +767,8 @@
     /* Winning the last battle earns the epilogue, played on the way back to the
        map rather than on top of the result panel — the swords and the reward get
        their moment first. */
-    var toMap = (won && !hasNext && TS.Story.pending('end'))
-      ? function () { resultShown = false; playCutscene('end', goSelect); }
+    var toMap = (won && !hasNext && TS.Story.pending('finale'))
+      ? function () { resultShown = false; playCutscene('finale', goSelect); }
       : goSelect;
     buttons.push(new TS.UI.Button({
       x: 436, y: 906, w: 250, h: 120, kind: 'big', label: 'MAP', labelSize: 32,
@@ -809,6 +886,14 @@
 
     for (var i = 0; i < buttons.length; i++) {
       if (buttons[i].kind !== 'none') buttons[i].draw(ctx);
+    }
+
+    /* The volley badge rides its button, so it only exists while that button is
+       in the live set — not under the pause menu, not on the result screen. */
+    if (screen === 'battle' && hud && battle &&
+        buttons.indexOf(hud.volleyBtn) !== -1) {
+      TS.UI.volleyOverlay(ctx, hud.volleyBtn, battle, hud.volleyArmed,
+        pointer.x, pointer.y, uiClock);
     }
 
     if (screen === 'select') drawSelectRows();
@@ -929,8 +1014,11 @@
     var UI = TS.UI;
     ctx.fillStyle = 'rgba(14,22,19,0.52)';
     ctx.fillRect(0, 0, TS.W, TS.H);
-    UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal, 'CHOOSE A BATTLE',
-      { size: 42, stroke: '#25404a' });
+    /* The ribbon names the CHAPTER — with two of them, "choose a battle" said
+       nothing the rows didn't. */
+    UI.labelRibbon(ctx, 'big', 66, 130, TS.W - 132, UI.PLATE.teal,
+      CHAPTERS[selChapter === -1 ? 0 : selChapter].name,
+      { size: 38, stroke: '#25404a' });
     /* Legend for the sword columns below. Sits in the gap between the ribbon and
        the first row, so it explains the swords before you scan them rather than
        after. The big ribbon art is 103px tall from y130, so it ends at 233 and the
@@ -940,17 +1028,22 @@
     });
   }
 
-  /* Rows are drawn after the buttons so the labels sit on top of the ribbon. */
+  /* Rows are drawn after the buttons so the labels sit on top of the ribbon.
+     Iterates the OPEN CHAPTER's slots — rows are buttons[0..count-1], and the
+     level index is chapter-relative plus the chapter's start. */
   function drawSelectRows() {
     var UI = TS.UI;
-    for (var i = 0; i < TS.Levels.count; i++) {
+    var ch = CHAPTERS[selChapter === -1 ? 0 : selChapter];
+    for (var k = 0; k < ch.count; k++) {
+      var i = ch.start + k;
       var lv = TS.Levels.get(i);
       var unlocked = TS.Save.isUnlocked(i);
-      var b = buttons[i];
+      var b = buttons[k];
+      if (!b) break;
       var pressed = b.pressed ? 3 : 0;
       /* Offsetting `top` alone cascades the whole row: the ribbon, both text lines
          and the swords all derive their position from it. */
-      var top = b.y + pressed + rowStagger(i);
+      var top = b.y + pressed + rowStagger(k);
       /* Big ribbon art is 103px tall, matching the button rect exactly. */
       UI.bigRibbon(ctx, b.x, top, b.w, unlocked ? UI.PLATE.teal : UI.PLATE.black);
       /* Centre of the coloured band, which sits above the geometric middle. */
@@ -1159,6 +1252,7 @@
     pause: togglePause,
     setSpeed: function (n) { speed = TS.clamp(n | 0, 1, 3); if (hud) hud.speedBtn.label = speed + 'x'; },
     summon: function (cls) { return battle ? battle.trySummon(cls) : false; },
+    volley: function (x) { return battle ? battle.castVolley(x) : false; },
     /* Gold cheat used only to exercise every card in verification. */
     grantGold: function (n) { if (battle) battle.gold = Math.min(battle.goldCap, battle.gold + n); },
     /* Run the simulation as fast as the CPU allows, with no rendering, so a

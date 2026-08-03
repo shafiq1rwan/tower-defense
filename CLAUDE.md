@@ -34,6 +34,13 @@ unregister service workers before the real page load**, every run, rather than r
 on remembering to bump. And when a change is provably present in the file yet absent
 on screen, suspect the worker before you re-read your own logic.
 
+**Three times now.** The third was on the human side: a "the gold animation is gone"
+report that was really the PWA loading from the worker's cache — with `serve.js` not
+even running. That is the trap's sharpest edge: the page coming up proves nothing,
+because the app shell loads fine with no server at all. When a person (not the
+harness) reports something missing right after code changes, have them hard-reload
+twice before investigating the code.
+
 The fastest way to settle "is the running code what I think it is" is to sample the
 canvas: on `http://localhost` it is same-origin and **not** tainted, so
 `getImageData` works and a colour can be read back directly. Only `file://` taints it.
@@ -94,6 +101,19 @@ sole counter, and it works only because of two separate things:
 If you retarget TNT to `findEnemy`, widen `Archer.contact`, or drop `TNT.dmg` below a
 Monk's healing throughput, the exploit comes straight back and the sweep will still
 look fine on battles 1-7.
+
+**The arrow volley is DEFENSIVE, and its fixed reach line is load-bearing.** The
+player's one active ability (V, or the button under the speed control: 40 gold,
+22s cooldown, 8 arrows) lands only on the player's half of the lane —
+`VOLLEY.reach` is a fixed 460, never relative to the front line. Four offensive
+versions all cracked the battle-8 gate, each differently, and every "nerf" made it
+worse (the full post-mortem is on `VOLLEY` in entities.js; the short version is
+that a deep volley suppresses the TNT artillery, and at the field cap any
+wallet-priced ability converts CLIPPED income into free damage). Structural rules:
+the spread comes from fixed arrays, never `Math.random`; `volleyStrike` hits units
+only, never a castle (safe siege would bypass the two-rank model); `volleyMark`
+and the reticle are draw-only. After touching any `VOLLEY` number, sweep an abuse
+bot that fires on cooldown at the deepest enemy — battle 8 fresh must stay 0/15.
 
 **Field cap is 8 because only ~6 allies can reach.** Two ranks strike across three
 depth rows. At the old cap of 14 a full army spent 76% of its time waiting and the
@@ -189,7 +209,8 @@ interior cell is **(col 1, row 1)**: its left/middle/right pixel columns agree, 
 
 `TS.dev` exposes narrow hooks for driving and inspecting: `screen`, `battle`,
 `cards`, `title()`, `select()`, `start(i)`, `pause()`, `setSpeed(n)`,
-`summon(cls)`, `grantGold(n)`, `counts()`, and `fastSim(seconds, policyFn)`.
+`summon(cls)`, `volley(x)`, `grantGold(n)`, `counts()`, and
+`fastSim(seconds, policyFn)`.
 
 `fastSim` runs the simulation with no rendering, so a whole battle resolves in a
 fraction of a second. Use it for balance work rather than watching battles.
@@ -203,21 +224,46 @@ at the same time catches asset typos immediately.
 ### The balance contract
 
 After touching any combat number, unit stat or wave script, confirm all four hold.
-A sweep over 8 battles x 4 policies takes seconds with `fastSim`.
+A sweep over 12 battles x 4 policies takes under a minute with `fastSim`.
+
+Battles 1-8 are chapter 1; battles 9-12 (chapter 2, the renegade knights) sit
+behind the battle-8 gate and are tuned for an UPGRADED army — fresh-save losses
+there are correct, exactly as battle 8's are. Chapter-2 economy stays at
+battle-8 levels deliberately: a first draft gave the player 300-360 start gold
+and every fresh bot swept the chapter at full tower HP, because a richer player
+out-produces any wave that has not spawned yet.
 
 | Policy | Fresh save | Fully upgraded |
 |---|---|---|
-| Buy the most expensive affordable unit | 6-7 of 8, **fails battle 8** | wins all 8 |
-| Sensible mixed composition | wins 7, **fails battle 8** | wins all 8 |
-| Archer + Pawn only | ~3 of 8 | ~7 of 8 |
-| Pawn spam only | ~1 of 8 | ~3 of 8 |
-| Do nothing | **loses** all 8 |  |
+| Buy the most expensive affordable unit | 5-7 of 12, **fails battle 8** | 11-12 (battle 7 ~60%) |
+| Sensible mixed composition | 7-9 of 12, **fails battle 8** | wins all 12 (battle 8 ~9/10, at ~78%) |
+| Archer + Pawn only | ~4-5 of 12 | ~10 of 12 |
+| Pawn spam only | ~1 of 12 | ~3-4 of 12 |
+| Do nothing | **loses** all 12 |  |
+
+(The greedy rows softened when the TNT-vs-castle hit-test was fixed — enemy
+artillery used to deal literally zero structural damage, so a crumbling defence was
+never punished. Greedy's slow expensive openings now genuinely lose battle 7
+sometimes, measured 6/10 maxed. That is the bug fix working, not a regression.)
 
 **Battle 8 is deliberately the wall that the Barracks exists for.** No policy beats
 it on a fresh save; upgrades are what open it. Since a flawless run of battles 1-7
 banks enough gold for a meaningful slice of training, a normal player arrives with
 the upgrades they need — the gate is a curve, not a brick wall. If a fresh save ever
 starts clearing battle 8, the campaign has lost its only difficulty ceiling.
+
+**The wall is guarded against more than the four canonical policies — keep it
+that way.** Measured while tuning the volley: a balanced bot that merely BURNED
+40 gold every 22s (buying nothing with it) beat battle 8 fresh 4/15 at full tower
+HP, and a zero-damage volley cast on cooldown managed 7/15. The burn skews the
+priority list toward cheaper units, and that pawn-skewed mix spawn-camped the hut
+before the heavy waves arrived. The repair is the two shielded Renegade Blades at
+t22 in battle 8's script, guarding the camp's opening — plain, burn and
+zero-damage-volley bots are all back to 0/15. (A second barrel wave at t38
+overshot the other way: MAXED balanced fell to 6/10, and the gate is supposed to
+open, not wobble. It was removed; maxed balanced is 9/10 at ~78% tower HP.)
+After adding ANY ability or income lever, re-run the burn bot at battle 8, not
+just the canonical four.
 
 The bot policies are a **floor, not a ceiling**: they never retreat, re-time a heal,
 or react, so a human plays strictly better than these numbers. Do not tune to make a

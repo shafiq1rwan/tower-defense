@@ -465,6 +465,101 @@
     return out;
   };
 
+  /* ----------------------------------------------------------- volley HUD -- */
+
+  /* Drawn AFTER the shared button pass, because the badge sits on the button's
+     face and the cooldown shade has to cover it. The button itself is a plain
+     rndBlue with no icon: the arrow glyph is the projectile sprite, angled as if
+     just loosed, which is the one picture in the pack that says "volley". */
+  UI.volleyOverlay = function (ctx, btn, battle, armed, px, py, clock) {
+    var cx = btn.x + btn.w / 2;
+    var cy = btn.y + (btn.pressed ? 49 : 42);
+    TS.drawFrame(ctx, TS.SPR.arrow, 0, cx, cy, { rot: -0.85, scale: 0.85 });
+
+    var cd = battle.volleyCd;
+    if (cd > 0) {
+      /* The rndBlue button is CIRCULAR, so its shade and ring are circles too —
+         a rounded rect read as a box floating around a coin. */
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#18221d';
+      ctx.beginPath();
+      ctx.arc(cx, btn.y + 44, 51, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+      TS.text(ctx, Math.ceil(cd), cx, cy, {
+        size: 38, fill: '#fff8e6', stroke: '#26332c'
+      });
+      return;
+    }
+
+    /* Costs gold like a card, so it is priced like one: coin + amount below the
+       button, red when short — the same affordability language the cards use. */
+    var affordable = battle.gold >= TS.VOLLEY.cost;
+    UI.coinAmount(ctx, TS.VOLLEY.cost, cx, btn.y + btn.h + 12, {
+      size: 22, scale: 0.4,
+      fill: affordable ? '#ffd257' : '#ff8f7a', stroke: '#3a2418'
+    });
+
+    /* Ready: the same warm pulse the cards use, so "you can press this now"
+       reads as one language across the HUD. */
+    if (affordable) {
+      ctx.save();
+      ctx.globalAlpha = armed ? 0.95 : 0.45 + 0.3 * Math.sin(clock * 4);
+      ctx.strokeStyle = '#ffd257';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(cx, btn.y + 44, 50, 0, 6.2832);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (!armed) return;
+
+    /* Armed: say what the next tap does, and show where it lands. */
+    TS.text(ctx, 'TAP THE LANE TO LOOSE A VOLLEY', TS.W / 2, TS.LAY.laneTop - 26, {
+      size: 22, fill: '#ffe9ad', stroke: '#3a2418'
+    });
+    if (py > TS.LAY.laneTop - 70 && py < TS.LAY.laneBot + 70 && px > -900) {
+      /* The reticle STOPS at max reach rather than following the finger past
+         it — the volley covers your line, it is not long-range artillery (see
+         VOLLEY.reach in entities.js). The ring turning red says "that is as
+         far as they can shoot" without a word of text. */
+      var reach = battle.volleyReach();
+      var clamped = px > reach;
+      if (clamped) px = reach;
+      var ry = TS.clamp(py, TS.LAY.surfTop + 30, TS.LAY.surfBot + 20);
+      ctx.save();
+      ctx.globalAlpha = 0.6 + 0.25 * Math.sin(clock * 7);
+      /* Gold alone disappears on the sand — every stroke gets the dark
+         understroke the outlined text uses, for the same reason. */
+      var ringCol = clamped ? '#ff8f7a' : '#ffd257';
+      ctx.strokeStyle = '#2a1c10';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(px, ry, 58, 22, 0, 0, 6.2832);
+      ctx.stroke();
+      ctx.strokeStyle = ringCol;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(px, ry, 58, 22, 0, 0, 6.2832);
+      ctx.stroke();
+      ctx.strokeStyle = '#2a1c10';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(px - 12, ry); ctx.lineTo(px + 12, ry);
+      ctx.moveTo(px, ry - 8); ctx.lineTo(px, ry + 8);
+      ctx.stroke();
+      ctx.strokeStyle = ringCol;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(px - 12, ry); ctx.lineTo(px + 12, ry);
+      ctx.moveTo(px, ry - 8); ctx.lineTo(px, ry + 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
   /* ------------------------------------------------------------ battle HUD -- */
 
   function fmtTime(t) {

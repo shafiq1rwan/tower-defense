@@ -125,6 +125,7 @@ const ART = [
   "UI Elements/UI Elements/Human Avatars/Avatars_08.png",
   "UI Elements/UI Elements/Human Avatars/Avatars_09.png",
   "UI Elements/UI Elements/Human Avatars/Avatars_10.png",
+  "UI Elements/UI Elements/Human Avatars/Avatars_16.png",
   "UI Elements/UI Elements/Icons/Icon_01.png",
   "UI Elements/UI Elements/Icons/Icon_02.png",
   "UI Elements/UI Elements/Icons/Icon_03.png",
@@ -167,9 +168,18 @@ const ART = [
   "Units/Purple Units/Archer/Archer_Run.png",
   "Units/Purple Units/Archer/Archer_Shoot.png",
   "Units/Purple Units/Archer/Arrow.png",
+  "Units/Purple Units/Lancer/Lancer_Idle.png",
+  "Units/Purple Units/Lancer/Lancer_Right_Attack.png",
+  "Units/Purple Units/Lancer/Lancer_Right_Defence.png",
+  "Units/Purple Units/Lancer/Lancer_Run.png",
   "Units/Purple Units/Monk/Heal.png",
   "Units/Purple Units/Monk/Idle.png",
   "Units/Purple Units/Monk/Run.png",
+  "Units/Purple Units/Warrior/Warrior_Attack1.png",
+  "Units/Purple Units/Warrior/Warrior_Attack2.png",
+  "Units/Purple Units/Warrior/Warrior_Guard.png",
+  "Units/Purple Units/Warrior/Warrior_Idle.png",
+  "Units/Purple Units/Warrior/Warrior_Run.png",
   "icons/icon-192.png"
 ];
 

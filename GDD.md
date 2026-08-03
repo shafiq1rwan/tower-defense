@@ -259,6 +259,21 @@ line without stalling it; it takes three to blunt a proper front, at which point
 them is obviously the play. It also queues *behind its own crowd*, so you kill through
 the screen to reach it — the same counterplay shape as the TNT.
 
+### 6.3 Chapter 2's blades
+
+Two more renegades carry the second chapter, both MELEE so the reachability trap
+above never applies to them:
+
+- **Renegade Blade** (purple Warrior, 150hp / 17dmg, guards): the player Warrior's
+  mirror, tuned one step below it so the mirror match rewards upgrades instead of
+  stonewalling them. Its job is to make cheap-swarm pushes expensive — which is
+  also why a pair of them at t22 is what seals battle 8's spawn-camp hole.
+- **Renegade Captain** (purple Lancer, 420hp / 36dmg, guards, speed 30): the heavy.
+  22.5 dps is under two player Warriors' answer, so it is a WALL that grinds, not
+  an assassin — the counter is focus fire, and its slow walk telegraphs when.
+  Biggest knight bounty (18); the TNT keeps the overall crown (20) because
+  bounties reward reachability, not toughness.
+
 ---
 
 ## 7. Progression
@@ -312,13 +327,27 @@ difficulty ceiling.
 | 6 | Two Fronts | Hold, then push | all | 480 | 580 | 230 / 20 / 560 | 1.08 | 230s |
 | 7 | Iron Tide | Survive, then break through | all | 500 | 640 | 250 / 22 / 620 | 1.11 | 245s |
 | 8 | The Goblin Camp | Burn down the goblin hut | all | 520 | 720 | 280 / 24 / 700 | 1.15 | 260s |
+| 9 | Broken Oaths | Rout the renegade vanguard | all | 540 | 760 | 240 / 22 / 700 | 1.12 | 270s |
+| 10 | The Captain's Column | Bring down the Renegade Captain | all | 560 | 800 | 250 / 23 / 720 | 1.14 | 280s |
+| 11 | Ashes on the Wind | Weather the combined assault | all | 580 | 850 | 260 / 23 / 740 | 1.17 | 290s |
+| 12 | The Renegade King | End the march for good | all | 600 | 900 | 270 / 24 / 760 | 1.20 | 300s |
+
+Battles 1–8 are **Chapter I: The Goblin War**; 9–12 are **Chapter II: The Renegade
+March**, unlocked by beating battle 8 and tuned for the upgraded army a player has
+by then. Chapter 2's player economy deliberately stays at battle-8 levels — a first
+draft with 300–360 start gold was swept at full tower HP by FRESH bots, because a
+richer player out-produces any wave that has not spawned yet. Its waves are also
+front-loaded (shields on the field by t2–8): the measured failure mode of easy
+battles is scripts whose pressure arrives after the battle is already decided.
 
 **Teaching order.** One new idea per battle: 1 introduces melee, 2 the TNT (and the
 Archer to answer it), 3 volume, 4 the Barrel and the Monk, 5 the Lancer and massed
-dynamite, 6–8 the renegades. The renegades arrive from 5 because a healer only means
-something once the player has enough damage on the field for denying it to matter.
+dynamite, 6–8 the renegades as hirelings, 9 the shielded Blade line, 10 the Captain,
+11 combined arms, 12 everything at once. The renegades arrive from 5 because a healer
+only means something once the player has enough damage on the field for denying it
+to matter.
 
-**`buff` stays low** (max 1.15). The enemy already gets free units; a large multiplier
+**`buff` stays low** (max 1.20). The enemy already gets free units; a large multiplier
 on top makes late battles mathematically unwinnable rather than hard.
 
 **Waves are a declarative timed script** — `{ t, cls, n, gap }` — not a gold-budget AI,
@@ -406,11 +435,30 @@ on the fourth attempt at battle 8 is how you make someone quit.
 |---|---|
 | Tap / click a card | Summon |
 | `1`–`5` | Summon by slot |
+| Arrow button / `V`, then tap the lane | Arrow volley (40g, 22s cd) |
 | Speed button / `Space` | Cycle 1× / 2× / 3× |
 | Gear / `P` / `Esc` | Pause |
 | Tap anywhere (cutscene) | Advance — completes the typewriter first |
 
 Leaving a battle mid-fight asks for confirmation; a mis-tap should not throw away a run.
+
+### 10.1 The arrow volley — the second verb
+
+The roster gives the player one decision (what to buy); the volley adds a second
+(where and when to intervene). Arm it, tap the lane, and the tower looses eight
+arrows in a fixed spread — 16 damage each in a 26px strike radius, enough to
+gut a Torch clump or finish wounded attackers, deliberately not enough to
+assassinate anything healthy at battle-8 buffs.
+
+Its defining constraint is that it is **defensive**: the landing centre is capped
+at a fixed line just past mid-lane (`VOLLEY.reach` = 460), shown by the aiming
+ring turning red. Four offensive versions were tried and every one cracked the
+battle-8 gate — a deep volley suppresses the TNT artillery (the sole counter to
+a massed back line), and once the field cap pins the army at 8 with gold clipped
+at the cap, any wallet-priced ability converts wasted income into free damage,
+which is why pricing it at 40 gold made the problem worse rather than better.
+A fixed defensive line is the only shape that cannot fund a push by
+construction. The tuning post-mortem lives on `VOLLEY` in entities.js.
 
 ---
 
@@ -468,12 +516,18 @@ Honest list, roughly by value:
    waves and could be promoted.
 2. **Nothing teaches the central mechanic.** That only ~6 units can reach is the reason
    massing does nothing, and the game never says so.
-3. **Player agency is thin.** The only input is *which card, when* — no retreat, no
-   targeting, no ability. One tactical verb would raise the skill ceiling most.
+3. **Player agency is thin.** ~~The only input is *which card, when*.~~ Partly
+   addressed: the arrow volley (§10.1) adds a targeted, timed intervention. Still no
+   retreat or rally — a positioning verb remains the biggest agency gap.
+3b. ~~Battle 8's wall is calibrated against four bot policies, not the composition
+   space.~~ **Repaired.** The burn-bot exploit (4/15 fresh wins at full tower HP via
+   a cheapened mix spawn-camping the hut) is closed by two shielded Renegade Blades
+   guarding the camp's opening at t22. Burn, zero-damage-volley and plain bots all
+   measure 0/15 fresh; maxed balanced still opens the gate at 9/10.
 4. **Progress may not persist on itch.io.** The game runs in a third-party iframe, so
    `localStorage` is partitioned and Safari can clear it. Degrades gracefully (every
    access is guarded) but a save code would fix it.
-5. **The simulation uses the global `Math.random`.** Eight call sites. Until it has its
+5. **The simulation uses the global `Math.random`.** Six call sites. Until it has its
    own generator, the "presentation must not touch sim RNG" rule is a discipline rather
    than a guarantee — and sweep results keep run-to-run variance that makes single
    battles untrustworthy.

@@ -20,7 +20,8 @@
      Because each class belongs to exactly one faction, sprites are keyed by class
      alone — there is no team dimension to carry around. */
   TS.CLASSES = ['Pawn', 'Warrior', 'Archer', 'Monk', 'Lancer'];
-  TS.ENEMY_CLASSES = ['Torch', 'TNT', 'Barrel', 'FoeArcher', 'FoeMonk'];
+  TS.ENEMY_CLASSES = ['Torch', 'TNT', 'Barrel', 'FoeArcher', 'FoeMonk',
+    'FoeWarrior', 'FoeLancer'];
 
   /* Frame size and foot anchor per class, measured from the sheets. Feet land on
      the same ground line for every class so mixed ranks line up. */
@@ -34,6 +35,9 @@
     /* Enemy knights share the blue set's geometry exactly. */
     FoeArcher: { frame: 192, anchor: [96, 135] },
     FoeMonk: { frame: 192, anchor: [96, 135] },
+    FoeWarrior: { frame: 192, anchor: [96, 135] },
+    /* 320px frames like the player's Lancer. */
+    FoeLancer: { frame: 320, anchor: [160, 202] },
     Torch: { frame: 192, anchor: [96, 133] },
     TNT: { frame: 192, anchor: [96, 133] },
     /* A rolling barrel bomb — smaller frames than the humanoids. */
@@ -118,6 +122,21 @@
       idle: ['Monk/Idle.png', 6],
       run: ['Monk/Run.png', 4],
       attack: ['Monk/Heal.png', 11]
+    },
+    /* Chapter-2 renegades. Measured: purple sheets match blue frame for frame
+       (Warrior 1536/1152/768/768/1152 x192; Lancer 3840/1920/960/1920 x320). */
+    FoeWarrior: {
+      idle: ['Warrior/Warrior_Idle.png', 8],
+      run: ['Warrior/Warrior_Run.png', 6],
+      attack: ['Warrior/Warrior_Attack1.png', 4],
+      attack2: ['Warrior/Warrior_Attack2.png', 4],
+      guard: ['Warrior/Warrior_Guard.png', 6]
+    },
+    FoeLancer: {
+      idle: ['Lancer/Lancer_Idle.png', 12],
+      run: ['Lancer/Lancer_Run.png', 6],
+      attack: ['Lancer/Lancer_Right_Attack.png', 3],
+      guard: ['Lancer/Lancer_Right_Defence.png', 6]
     }
   };
   TS.FOE_SHEETS = FOE_SHEETS;
@@ -126,7 +145,7 @@
      order. Verified by eye: plumed helm, bowl helm, conical helm, tonsure,
      long hair. Knights only — the Goblin faction ships no portraits. */
   var AVATAR_ORDER = ['Warrior', 'Pawn', 'Lancer', 'Monk', 'Archer'];
-  var TEAM_AVATAR_BLOCK = { Blue: 0, Red: 5 };
+  var TEAM_AVATAR_BLOCK = { Blue: 0, Red: 5, Purple: 15 };
   TS.avatarKey = function (team, cls) {
     var i = TEAM_AVATAR_BLOCK[team] + AVATAR_ORDER.indexOf(cls) + 1;
     return 'avatar' + i;
@@ -268,6 +287,10 @@
     for (var a = 1; a <= 10; a++) {
       m['avatar' + a] = UI + 'Human Avatars/Avatars_' + (a < 10 ? '0' : '') + a + '.png';
     }
+    /* One purple portrait for chapter 2's renegade captain — block 16-20 is the
+       purple colourway, and 16 is the Warrior pose (measured ink x22-218 y32-212,
+       the same pose as the blue Warrior's). */
+    m['avatar16'] = UI + 'Human Avatars/Avatars_16.png';
     return m;
   }
 
